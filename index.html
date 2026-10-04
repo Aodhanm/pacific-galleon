@@ -643,14 +643,6 @@ function drawBattleFx(){
       }
     }
   }
-  ctx.fillStyle = "#1c1712";
-  for (const b of balls){
-    if (b.hit) continue;
-    const f = b.t / b.dur;
-    const x = b.x0 + (b.tx - b.x0)*f;
-    const y = b.y0 + (b.ty - b.y0)*f - Math.sin(f*Math.PI)*H*.06;   // the arc
-    ctx.beginPath(); ctx.arc(x, y, Math.max(2, H*.004), 0, Math.PI*2); ctx.fill();
-  }
   for (const p of puffs){
     ctx.globalAlpha = Math.max(0, p.a) * .9;
     const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r);

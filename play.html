@@ -88,6 +88,10 @@ let reload = 0, smoke = [], balls = [], splashes = [];
 let closure = 0, lastD = null, sailT = 0;
 let hold = 0, chestT = 0, chestFly = null;   // what is left in her, the transfer
 let preload = 0, pballs = [];                // HER guns, firing back at you
+let consort = null, preload2 = 0, cballs = [];   // the second Spaniard (the Begona)
+const GAL_NAMES = ["Nuestra Senora de Covadonga","Santa Ana","Encarnacion",
+                   "Rosario","Santisima Trinidad","Pilar"];
+let score = +(localStorage.getItem("pg_plunder") || 0);
 let burn = 0, chestPops = [];                // she is afire; the +1s over your deck
 let birds = [], gullWait = 10 + Math.random()*12;
 let hits = [], damageFlash = 0, shake = 0;    // impact sparks, the red flash, a jolt
@@ -97,7 +101,8 @@ function reset(){
   ship = makeShip(shipKey, CV.AMBUSH.x, CV.AMBUSH.y, CV.AMBUSH.hdg);
   ship.canvas = .15;
   prize = makeShip("galleon", CV.LANE[2].x, CV.LANE[2].y, 110);
-  prize.canvas = 1;
+  prize.canvas = 1; prize.sink = 0;
+  prize.name = GAL_NAMES[(Math.random()*GAL_NAMES.length)|0];
   wp = 3;
   phase = "brief"; elapsed = 0;
   reload = 0; smoke = []; balls = []; splashes = [];
@@ -106,6 +111,7 @@ function reset(){
   preload = 3; pballs = []; burn = 0; chestPops = [];
   birds = []; gullWait = 10 + Math.random()*12;
   hits = []; damageFlash = 0; shake = 0;
+  consort = null; preload2 = 0; cballs = [];
   ship.rigDamage = 0; ship.damage = 0;
 }
 reset();
@@ -564,9 +570,74 @@ function combatStep(dt){
   damageFlash = Math.max(0, damageFlash - dt);
   shake = Math.max(0, shake - dt*2.4);
   if (!prize.struck && (prize.rigDamage||0) >= .75){
-    prize.struck = true;
+    prize.struck = true; prize.struckAt = env.t;
     phase = "struck";
+    spawnConsort();                   // her consort bears down to save her
   }
+  // once she is afire she settles and goes down a little
+  if (burn > 2.4) prize.sink = Math.min(.7, prize.sink + dt*.12);
+  // the consort's guns at you
+  preload2 = Math.max(0, preload2 - dt);
+  for (let i = cballs.length-1; i >= 0; i--){
+    const b = cballs[i]; b.t += dt;
+    if (b.t >= b.dur){
+      if (b.hit){
+        ship.rigDamage = Math.min(1, (ship.rigDamage||0) + .035);
+        ship.damage += .08;
+        hits.push({ x: b.tx, y: b.ty, t: 0, mine: false });
+        damageFlash = .55; shake = 1; sfxHit();
+      } else { splashes.push({ x: b.tx, y: b.ty, t: 0 }); }
+      cballs.splice(i, 1);
+    }
+  }
+}
+// ---------------------------------------------- the second Spaniard
+function spawnConsort(){
+  if (consort) return;
+  // comes down out of the north-west, to seaward, a heavy man-of-war
+  const a = (300 + Math.random()*30) * Math.PI/180;      // from the NW
+  const r = 880;
+  consort = makeShip("galleon", ship.x + Math.sin(a)*r, ship.y - Math.cos(a)*r, 135);
+  consort.canvas = 1; consort.name = "the Begona"; consort.enemy = true;
+}
+function consortStep(dt){
+  if (!consort) return;
+  const want = Math.atan2(ship.x - consort.x, -(ship.y - consort.y));
+  consort.helm = Math.max(-1, Math.min(1, norm(want - consort.hdg) * 2.5));
+  consort.canvas = 1;
+  // her broadside at you, when you are near her beam and in range
+  const dx = ship.x - consort.x, dy = ship.y - consort.y;
+  const rel = norm(Math.atan2(dx,-dy) - consort.hdg), a = Math.abs(rel)*180/Math.PI;
+  const d = Math.hypot(dx,dy);
+  if (!(a>55 && a<125) || d > RANGE || preload2 > 0) return;
+  preload2 = 9 + Math.random()*4;
+  const c = consort.cls, nG = Math.max(4, Math.floor(c.len/6));
+  const fx = Math.sin(consort.hdg), fy = -Math.cos(consort.hdg);
+  const sx2 = Math.cos(consort.hdg), sy2 = Math.sin(consort.hdg);
+  const side = rel > 0 ? 1 : -1;
+  sfxBroadside(nG); sfxWhistle(.3 + (d/RANGE)*.6);
+  for (let i=0;i<nG;i++){
+    const along = -c.len*.26 + (i+.5)*(c.len*.5/nG);
+    const gx = consort.x + fx*along + sx2*side*c.beam*.5;
+    const gy = consort.y + fy*along + sy2*side*c.beam*.5;
+    for (let s2=0;s2<3;s2++)
+      smoke.push({ x:gx, y:gy, r:2+Math.random()*2, a:.85,
+        vx: sx2*side*(6+Math.random()*5), vy: sy2*side*(6+Math.random()*5) });
+    const spread = (Math.random()-.5)*(d*.22+18);
+    cballs.push({ x:gx, y:gy, tx: ship.x+fx*spread*.4+sx2*(Math.random()-.5)*26,
+      ty: ship.y+fy*spread*.4+sy2*(Math.random()-.5)*26, t:0,
+      dur: (.3+(d/RANGE)*.6)*(.92+Math.random()*.16),
+      hit: Math.random() < Math.max(.1, .4 - d/RANGE*.32) });
+  }
+}
+
+// ---------------------------------------------- grapple and board
+function canBoard(){
+  return prize.struck && Math.hypot(prize.x-ship.x, prize.y-ship.y) < 55;
+}
+function doBoard(){
+  phase = "board";
+  ship.canvas = Math.min(ship.canvas, .1);
 }
 function drawShots(){
   ctx.fillStyle = "#222222";
@@ -594,7 +665,7 @@ function drawShots(){
     ctx.globalAlpha = 1;
   }
   ctx.fillStyle = "#222222";
-  for (const b of pballs){
+  for (const b of pballs.concat(cballs)){
     const f = Math.min(1, b.t / b.dur);
     const x = b.x + (b.tx - b.x) * f, y = b.y + (b.ty - b.y) * f;
     ctx.beginPath(); ctx.arc(T.X(x), T.Y(y), Math.max(1, T.S(.4)), 0, Math.PI*2); ctx.fill();
@@ -770,13 +841,19 @@ function tone(type, f0, f1, dur, vol, delay){
 // boom under it for weight. Not the long rolling recording.
 function sfxBroadside(nG){
   if (!A) return;
+  // a rolling burst: three reports a fraction apart, down the ship's side
+  const shots = Math.max(2, Math.min(4, Math.round((nG||4)/2)));
   if (shotBuf){
-    const s2 = A.createBufferSource(); s2.buffer = shotBuf;
-    s2.playbackRate.value = .94 + Math.random()*.12;
-    const g = A.createGain(); g.gain.value = .85;
-    s2.connect(g); g.connect(sfxGain); s2.start();
+    for (let i = 0; i < shots; i++){
+      const s2 = A.createBufferSource(); s2.buffer = shotBuf;
+      s2.playbackRate.value = .9 + Math.random()*.2;
+      const g = A.createGain(); g.gain.value = .6 - i*.08;
+      s2.connect(g); g.connect(sfxGain);
+      s2.start(A.currentTime + i * (.07 + Math.random()*.06));
+    }
   }
-  tone("triangle", 72 + Math.random()*14, 28, .5, .3);
+  tone("triangle", 66 + Math.random()*12, 26, .55, .34);
+  tone("triangle", 80 + Math.random()*12, 30, .4, .2, .1);
 }
 // the shot whistling THROUGH its flight: it starts just after the bang
 // and is cut the instant the ball lands, so the whistle tracks the shot.
@@ -790,8 +867,8 @@ function sfxWhistle(flight){
   const t0 = A.currentTime + .1;                            // just after the bang
   const end = t0 + Math.max(.18, flight - .06);             // cut as it lands
   g.gain.setValueAtTime(.0001, t0);
-  g.gain.exponentialRampToValueAtTime(.4, t0 + .06);
-  g.gain.setValueAtTime(.4, Math.max(t0 + .07, end - .05));
+  g.gain.exponentialRampToValueAtTime(.16, t0 + .06);       // well under the guns
+  g.gain.setValueAtTime(.16, Math.max(t0 + .07, end - .05));
   g.gain.exponentialRampToValueAtTime(.0001, end);
   s2.start(t0); s2.stop(end + .03);
 }
@@ -809,10 +886,13 @@ function sfxChest(){
 }
 function sfxGull(){
   if (!A || !gullBufs.length) return;
-  const s2 = A.createBufferSource(); s2.buffer = gullBufs[(Math.random()*gullBufs.length)|0];
-  s2.playbackRate.value = .95 + Math.random()*.12;
-  const g = A.createGain(); g.gain.value = .14 + Math.random()*.1;
-  s2.connect(g); g.connect(sfxGain); s2.start();
+  // two overlapping cries so a passing flock is clearly heard
+  for (let i = 0; i < 2; i++){
+    const s2 = A.createBufferSource(); s2.buffer = gullBufs[(Math.random()*gullBufs.length)|0];
+    s2.playbackRate.value = .92 + Math.random()*.16;
+    const g = A.createGain(); g.gain.value = .4 + Math.random()*.18;
+    s2.connect(g); g.connect(sfxGain); s2.start(A.currentTime + i*0.12);
+  }
 }
 // the ship catching fire, a soft roar that builds
 function sfxFire(){
@@ -895,16 +975,16 @@ function winCard(){
   music("grenadiers", true, .5);
   const took = Math.floor(ship.cargo);
   const fired = burn > 0;
+  score += took; localStorage.setItem("pg_plunder", score);
   card(`<h1>${fired ? "Her bones are burning" : "Away with the prize's gold"}</h1>
-    <p>You stand clear with <b>${took} chests</b> of her treasure aboard, in
-    <b>${Math.floor(elapsed/60)}m ${Math.floor(elapsed%60)}s</b>.
+    <p>You stand clear with <b>${took} chests</b> aboard, in
+    <b>${Math.floor(elapsed/60)}m ${Math.floor(elapsed%60)}s</b>${
+      consort ? `, the <i>Begon&#771;a</i> left astern` : ""}.
     ${fired
       ? `You put your last broadside into her and left her <b>afire</b> on the
          water, ${hold} chests and all, so no one would know what you had taken.`
       : `You left <b>${hold}</b> chests in her hold that your ship could not stow.`}</p>
-    <p class="src">Cavendish off this cape, 1587, took what the <i>Desire</i> could
-    carry out of the <i>Santa Ana</i> and burned the rest: there was always more
-    in a Manila ship than her takers could hold.</p>
+    <p class="src">Total plunder taken: <b>${score} chests</b>.</p>
     <div class="go">Enter to sail it again</div>`);
 }
 function loseCard(){
@@ -942,11 +1022,16 @@ addEventListener("keydown", e => {
   }
   if (k === " "){
     e.preventDefault();
-    if (phase === "board") burnHer();          // fire her and run
-    else fire();                               // the broadside, any time
+    fire();                                    // SPACE: the broadside, any time
+  }
+  if (k === "g"){                              // G: grapple and board, alongside a struck ship
+    if (phase === "struck" && canBoard()) doBoard();
   }
   if (k === "c"){
-    if (phase === "board") castOff();          // take your gold and slip away
+    if (phase === "board") castOff();          // C: take your gold and slip away
+  }
+  if (k === "x"){
+    if (phase === "board") burnHer();          // X: fire her and leave her burning
   }
   if (k === "escape") location.href = "index.html";
 });
@@ -997,10 +1082,20 @@ function hud(){
     <div>Left in her hold <b>${hold}</b></div>
     <div class="a">Every chest slows you</div>
     <div class="g">C &mdash; cast off and run with your gold</div>
-    <div class="r">SPACE &mdash; fire her and leave her burning</div>`
-    : phase === "escape" ? `
+    <div class="r">X &mdash; fire her and leave her burning</div>`
+    : phase === "escape" ? (() => {
+      const threat = consort || prize;
+      const dT = Math.hypot(threat.x-ship.x, threat.y-ship.y);
+      const goal = consort ? 1300 : 750;
+      return `
     <div>Treasure aboard <b>${Math.floor(ship.cargo)}</b> / ${cls.cap} chests</div>
-    <div>Get clear <b>${Math.max(0, 750 - Math.round(d))} yd</b> to go</div>`
+    <div>${consort ? "Outrun the Begon&#771;a" : "Get clear"} <b>${Math.max(0, goal - Math.round(dT))} yd</b> to go</div>
+    ${consort && dT < 500 ? '<div class="r">She is on you &mdash; crowd on sail!</div>' : ""}`;
+    })()
+    : phase === "struck" ? `
+    <div>She has struck &mdash; <b>${d < 1000 ? Math.round(d) + " yd" : (d/CV.YD_PER_NM).toFixed(1) + " nm"}</b> off</div>
+    <div>${d < 55 ? '<span class="g">G &mdash; grapple and board</span>' : '<span class="a">Close alongside to board</span>'}</div>
+    ${consort ? '<div class="r">A sail to windward: her consort!</div>' : ""}`
     : (phase !== "brief" && phase !== "over") ? `
     <div>The galleon <b>${pts(brg)}</b>, <b>${d < 1000 ? Math.round(d) + " yd" : (d/CV.YD_PER_NM).toFixed(1) + " nm"}</b></div>
     <div>${closure > .05 ? `<span class="g">Closing, ${closure.toFixed(1)} kn</span>`
@@ -1011,8 +1106,8 @@ function hud(){
   const orders = {
     wait: "Lie quiet. She is coming down the coast from the north-west; you will raise her topsails first. Work out to the point as she comes on, and do not let the arch rocks have you.",
     chase: "Run her down and lay her on your beam for the broadside, but mind her own guns: she will fire back. Cut her rig up until she strikes.",
-    struck: "She has struck her colours. Lay her aboard: close alongside and the grapnels will do the rest.",
-    board: "The grapnels are in her rail and the chests are coming over. Press C to cast off with your gold, or SPACE to fire her and leave her burning on the water.",
+    struck: "She has struck her colours. Close within hail and press G to grapple and board her.",
+    board: "The grapnels are in her rail and the chests are coming over. Press C to cast off with your gold, or X to fire her and leave her burning. Her consort is coming.",
     escape: "Cast off and get clear, heavy as she is. Make for the open sea.",
   };
   el("phase").textContent = {wait:"The ambush", chase:"The chase", struck:"She has struck",
@@ -1175,6 +1270,32 @@ function drawChestPops(){
   ctx.globalAlpha = 1;
   ctx.restore();
 }
+function drawSinking(s){
+  const k = s.sink, L = s.cls.len, B = s.cls.beam;
+  // the sea closing dark over her settling hull
+  ctx.save();
+  ctx.globalAlpha = Math.min(.7, k * .9);
+  ctx.fillStyle = "#15566e";
+  ctx.beginPath();
+  ctx.ellipse(T.X(s.x), T.Y(s.y), T.S(B*.6), T.S(L*.5), s.hdg, 0, Math.PI*2);
+  ctx.fill();
+  ctx.globalAlpha = 1;
+  // a spreading ring of foam and rising bubbles
+  ctx.strokeStyle = "rgba(255,255,255,.5)";
+  ctx.lineWidth = Math.max(1, T.S(.8));
+  ctx.beginPath();
+  ctx.ellipse(T.X(s.x), T.Y(s.y), T.S(B*.7 + k*B), T.S(L*.5 + k*B), s.hdg, 0, Math.PI*2);
+  ctx.stroke();
+  ctx.fillStyle = "rgba(255,255,255,.6)";
+  for (let i = 0; i < 10; i++){
+    const a2 = i*1.3 + s.x, rr = (i%3 + 1) * B * .3;
+    ctx.beginPath();
+    ctx.arc(T.X(s.x + Math.cos(a2)*rr), T.Y(s.y + Math.sin(a2)*rr),
+            Math.max(1, T.S(.5 + Math.random()*.6)), 0, Math.PI*2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
 function drawBirds(t){
   ctx.strokeStyle = "rgba(60,74,86,.6)";
   ctx.lineWidth = Math.max(1, T.S(.5));
@@ -1188,6 +1309,78 @@ function drawBirds(t){
     ctx.quadraticCurveTo(x + s2*.3, y - s2*.5, x + s2, y + s2*flap);
     ctx.stroke();
   }
+}
+// a name plate and a health bar floating above a ship
+function label(s, name, frac, enemy, note){
+  const x = T.X(s.x), y = T.Y(s.y) - T.S(s.cls.len*.5) - 16;
+  if (x < -80 || x > W+80 || y < -30 || y > H+30) return;
+  ctx.save();
+  ctx.textAlign = "center";
+  ctx.font = "600 12px " + getComputedStyle(document.body).fontFamily;
+  const w = Math.max(70, ctx.measureText(name).width + 18);
+  // a dark plate
+  ctx.globalAlpha = .82; ctx.fillStyle = "rgba(10,26,34,.72)";
+  ctx.fillRect(x - w/2, y - 15, w, 28);
+  ctx.globalAlpha = 1;
+  // the name
+  ctx.fillStyle = enemy ? "#f0c0a0" : "#dff0ea";
+  ctx.fillText(name, x, y - 2);
+  // the bar
+  const bw = w - 14, bx = x - bw/2, by = y + 5;
+  ctx.fillStyle = "rgba(150,170,184,.25)"; ctx.fillRect(bx, by, bw, 5);
+  if (note){
+    ctx.fillStyle = "#7fd6a2"; ctx.font = "700 9px " + getComputedStyle(document.body).fontFamily;
+    ctx.fillText(note, x, by + 4.5);
+  } else {
+    const f = Math.max(0, Math.min(1, frac));
+    const col = enemy ? (f>.5?"#e0a24a":"#d2603f")
+                      : (f>.5?"#5bbf7a":f>.25?"#d8a23a":"#d2603f");
+    ctx.fillStyle = col; ctx.fillRect(bx, by, bw*f, 5);
+  }
+  ctx.restore();
+}
+function drawLabels(){
+  if (phase === "brief" || phase === "over") return;
+  // you
+  label(ship, "H.M.S. " + ship.cls.name,
+        1 - Math.min(1, ship.damage/1.5), false);
+  // the prize
+  const prizeNote = prize.struck ? "STRUCK" : null;
+  label(prize, prize.name || "the galleon",
+        1 - Math.min(1, (prize.rigDamage||0)/.75), true, prizeNote);
+  // her consort
+  if (consort) label(consort, consort.name || "the consort", 1, true);
+}
+// a cannon that fills back up as the guns reload, to show you are ready
+function drawReloadIcon(){
+  const cx = W/2, cy = H - 52, w = 58, h = 20;
+  const prog = Math.max(0, Math.min(1, 1 - reload/6));   // 0 just fired .. 1 ready
+  const ready = reload <= 0;
+  ctx.save();
+  ctx.translate(cx, cy);
+  // the carriage + barrel silhouette
+  ctx.fillStyle = "#1c1712";
+  ctx.fillRect(-w/2, -h*.2, w*.78, h*.34);               // barrel
+  ctx.fillRect(w*.26, -h*.08, w*.14, h*.5);              // muzzle swell
+  ctx.fillStyle = "#3a2a1a";
+  ctx.beginPath(); ctx.arc(-w*.28, h*.42, 5, 0, Math.PI*2);  // wheels
+  ctx.arc(-w*.02, h*.42, 5, 0, Math.PI*2); ctx.fill();
+  // the powder fill behind, rising as she reloads
+  ctx.globalAlpha = .9;
+  ctx.fillStyle = "rgba(150,170,184,.2)"; ctx.fillRect(-w/2-4, -h*.9, w+8, h*1.5);
+  ctx.fillStyle = ready ? "#f2a63c" : "#9c6b2a";
+  ctx.fillRect(-w/2-4, h*.6 - (h*1.5)*prog, w+8, (h*1.5)*prog);
+  // label
+  ctx.globalAlpha = 1;
+  ctx.textAlign = "center";
+  ctx.font = "700 10px " + getComputedStyle(document.body).fontFamily;
+  ctx.fillStyle = ready ? "#f2d6a0" : "#8fa8b8";
+  ctx.fillText(ready ? "GUNS READY" : "reloading", 0, -h*.9 - 4);
+  if (ready){                                            // a glow when loaded
+    ctx.strokeStyle = "rgba(242,166,60,.7)"; ctx.lineWidth = 2;
+    ctx.strokeRect(-w/2-5, -h*.95, w+10, h*1.6);
+  }
+  ctx.restore();
 }
 function drawRose(){
   const R = Math.min(90, W*.07), cx = W - R - 34, cy = 210 + R;
@@ -1297,16 +1490,18 @@ function phasesStep(dt){
   const d = Math.hypot(prize.x-ship.x, prize.y-ship.y);
   if (phase === "wait" && d < 1700){ phase = "chase"; }
   if ((phase === "chase" || phase === "struck") && prize.x > CV.ESCAPE_X && !prize.struck) loseCard();
-  if (phase === "struck" && d < 48){
-    phase = "board";
-    ship.canvas = Math.min(ship.canvas, .1);
-  }
   if (phase === "board") boardStep(dt);
-  if (phase === "escape" && d > 750) winCard();
-  // beaten off: she has cut you up too badly to go on
-  if ((phase === "chase" || phase === "wait") && ship.damage > 1.5){
+  if (phase === "escape"){
+    // you are away once you have left your pursuer astern: the consort if
+    // she came, otherwise the prize herself
+    const threat = consort || prize;
+    const dT = Math.hypot(threat.x - ship.x, threat.y - ship.y);
+    if (dT > (consort ? 1300 : 750)) winCard();
+  }
+  // beaten off: cut up too badly to go on (in the chase, or by her consort)
+  if (phase !== "over" && phase !== "board" && ship.damage > 1.5){
     failCard("She has beaten you off",
-      "The galleon's guns cut your rigging and hull to pieces. She holds her course for Acapulco while you lie licking your wounds.");
+      "Their guns cut your rigging and hull to pieces. The Spaniards hold their course for Acapulco while you lie licking your wounds.");
   }
 }
 
@@ -1356,8 +1551,8 @@ function frame(now){
         if (!b.cried && b.t > 1.5 && Math.random() < dt*.4){ b.cried = true; sfxGull(); }
       }
       birds = birds.filter(b => b.t < 14);
-      prizeStep(dt);
-      for (let i=0;i<7;i++){ step(ship, env, dt); step(prize, env, dt); }
+      prizeStep(dt); consortStep(dt);
+      for (let i=0;i<7;i++){ step(ship, env, dt); step(prize, env, dt); if (consort) step(consort, env, dt); }
       for (const w of wakes) wakeStep(w, dt);
       combatStep(dt);
       const d = Math.hypot(prize.x-ship.x, prize.y-ship.y);
@@ -1381,7 +1576,9 @@ function frame(now){
   drawLand(env.t);
   drawRocks(env.t);
   drawSurf(env.t);
+  if (consort) drawShip(ctx, T, consort, env.t, C);
   drawShip(ctx, T, prize, env.t, C);
+  if (prize.sink > 0) drawSinking(prize);
   drawShip(ctx, T, ship, env.t, C);
   // the grapple lines, and the chest on its way over the rail
   if (phase === "board"){
@@ -1407,10 +1604,11 @@ function frame(now){
     }
   }
   drawShots();
+  drawLabels();
   drawBirds(env.t);
   if (phase === "board") drawTreasureInset();
   drawChestPops();
-  if (phase !== "brief" && phase !== "over"){ drawSailMark(); drawRose(); }
+  if (phase !== "brief" && phase !== "over"){ drawSailMark(); drawRose(); drawReloadIcon(); }
   if (damageFlash > 0){
     const a = damageFlash / .55;
     const g2 = ctx.createRadialGradient(W/2, H/2, Math.min(W,H)*.3, W/2, H/2, Math.max(W,H)*.7);
@@ -1450,12 +1648,12 @@ window.__dev = {
     for (let i = 0; i < n; i++){
       elapsed += h;
       CV.weatherStep(env, h);
-      prizeStep(h);
+      prizeStep(h); consortStep(h);
       if (this.auto != null){
         const off = norm(this.auto * Math.PI/180 - ship.hdg);
         ship.helm = Math.max(-1, Math.min(1, off * 2.5));
       }
-      for (let k = 0; k < 7; k++){ step(ship, env, h); step(prize, env, h); }
+      for (let k = 0; k < 7; k++){ step(ship, env, h); step(prize, env, h); if (consort) step(consort, env, h); }
       for (const w of wakes) wakeStep(w, h);
       combatStep(h);
       camUpdate(h);

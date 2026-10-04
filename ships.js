@@ -470,47 +470,49 @@ export function drawShip(ctx, T, s, t, C) {
     band(0, -L * .5 - L * .16, B * .4, B * .26 * set, .75);
   }
 
-  // ---- her colours, the ensign streaming downwind off the poop
+  // ---- her colours, off the ensign staff right aft. On striking, the
+  //      national ensign is HAULED DOWN (it shrinks in to the staff) and
+  //      a white flag of surrender is run up in its place.
   {
-    const fl = Math.max(3, L * .14);             // flag length, yards
-    const fw = fl * .52;
+    const fl0 = Math.max(3, L * .14), fw = fl0 * .52;
     const wave = Math.sin(t * 5 + s.x * .01) * .12;
     const a = Math.atan2(dwy, dwx) + wave;
-    ctx.save();
-    ctx.translate(0, S(L * .46));                // the ensign staff, right aft
-    ctx.rotate(a);
-    ctx.translate(S(1.2), 0);
-    if (c.flag === "burgundy") {
-      ctx.fillStyle = "#efe6d2";
-      ctx.fillRect(0, S(-fw/2), S(fl), S(fw));
-      ctx.strokeStyle = "#b3362a";
-      ctx.lineWidth = Math.max(1, S(.4));
-      ctx.beginPath();                            // the ragged red saltire
-      ctx.moveTo(S(fl*.1), S(-fw*.34)); ctx.lineTo(S(fl*.9), S(fw*.34));
-      ctx.moveTo(S(fl*.1), S(fw*.34));  ctx.lineTo(S(fl*.9), S(-fw*.34));
-      ctx.stroke();
+    const low = s.struck ? Math.min(1, (t - (s.struckAt ?? t)) / 1.3) : 0;
+    const flag = (fl, type) => {
+      if (fl < .4) return;
+      ctx.save();
+      ctx.translate(0, S(L * .46)); ctx.rotate(a); ctx.translate(S(1.0), 0);
+      if (type === "burgundy"){
+        ctx.fillStyle = "#efe6d2"; ctx.fillRect(0, S(-fw/2), S(fl), S(fw));
+        ctx.strokeStyle = "#b3362a"; ctx.lineWidth = Math.max(1, S(.4));
+        ctx.beginPath();
+        ctx.moveTo(S(fl*.1), S(-fw*.34)); ctx.lineTo(S(fl*.9), S(fw*.34));
+        ctx.moveTo(S(fl*.1), S(fw*.34));  ctx.lineTo(S(fl*.9), S(-fw*.34)); ctx.stroke();
+      } else if (type === "george"){
+        ctx.fillStyle = "#f4f0e6"; ctx.fillRect(0, S(-fw/2), S(fl), S(fw));
+        ctx.strokeStyle = "#c03a2a"; ctx.lineWidth = Math.max(1, S(.45));
+        ctx.beginPath();
+        ctx.moveTo(0, 0); ctx.lineTo(S(fl), 0);
+        ctx.moveTo(S(fl*.38), S(-fw/2)); ctx.lineTo(S(fl*.38), S(fw/2)); ctx.stroke();
+      } else {                                      // a plain white flag
+        ctx.fillStyle = "#fbfbf6"; ctx.fillRect(0, S(-fw/2), S(fl), S(fw));
+      }
+      ctx.strokeStyle = "rgba(30,20,10,.5)"; ctx.lineWidth = Math.max(.6, S(.2));
+      ctx.strokeRect(0, S(-fw/2), S(fl), S(fw));
+      ctx.restore();
+    };
+    if (!s.struck){
+      flag(fl0, c.flag === "burgundy" ? "burgundy" : "george");
     } else {
-      ctx.fillStyle = "#f4f0e6";
-      ctx.fillRect(0, S(-fw/2), S(fl), S(fw));
-      ctx.strokeStyle = "#c03a2a";
-      ctx.lineWidth = Math.max(1, S(.45));
-      ctx.beginPath();                            // St George's cross
-      ctx.moveTo(0, 0); ctx.lineTo(S(fl), 0);
-      ctx.moveTo(S(fl*.38), S(-fw/2)); ctx.lineTo(S(fl*.38), S(fw/2));
-      ctx.stroke();
+      // the national colours coming down, the white going up
+      flag(fl0 * (1 - low), c.flag === "burgundy" ? "burgundy" : "george");
+      flag(fl0 * Math.max(0, (low - .35) / .65), "white");
+      // the struck ensign bundled at the staff foot
+      if (low > .6){
+        ctx.fillStyle = c.flag === "burgundy" ? "#b3362a" : "#c03a2a";
+        ctx.beginPath(); ctx.arc(0, S(L * .48), Math.max(1.4, S(.8)), 0, Math.PI*2); ctx.fill();
+      }
     }
-    ctx.strokeStyle = "rgba(30,20,10,.5)";
-    ctx.lineWidth = Math.max(.6, S(.2));
-    ctx.strokeRect(0, S(-fw/2), S(fl), S(fw));
-    ctx.restore();
-  }
-
-  // struck her colours: a white flag at the main instead of way on her
-  if (s.struck) {
-    ctx.fillStyle = "#ffffff";
-    ctx.globalAlpha = .6 + .4 * Math.max(0, Math.sin(t * 4));
-    ctx.beginPath(); ctx.arc(0, S(L * .02), Math.max(2, S(1.6)), 0, Math.PI * 2); ctx.fill();
-    ctx.globalAlpha = 1;
   }
 
   ctx.restore();

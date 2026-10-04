@@ -87,6 +87,8 @@ let env, ship, prize, phase, elapsed, wp;
 let reload = 0, smoke = [], balls = [], splashes = [];
 let closure = 0, lastD = null, sailT = 0;
 let hold = 0, chestT = 0, chestFly = null;   // what is left in her, the transfer
+let preload = 0, pballs = [];                // HER guns, firing back at you
+let burn = 0, chestPops = [];                // she is afire; the +1s over your deck
 const PRIZE_HOLD = 120;                      // chests in her: far more than you can stow
 function reset(){
   env = CV.makeWeather();
@@ -99,6 +101,8 @@ function reset(){
   reload = 0; smoke = []; balls = []; splashes = [];
   lastD = null; closure = 0;
   hold = PRIZE_HOLD; chestT = 0; chestFly = null;
+  preload = 3; pballs = []; burn = 0; chestPops = [];
+  ship.rigDamage = 0; ship.damage = 0;
 }
 reset();
 
@@ -416,6 +420,7 @@ function gunBearing(){
   return { rel, inArc: a > 35 && a < 145, side: rel > 0 ? 1 : -1, d };
 }
 function fire(){
+  if (phase === "over" || phase === "brief") return;
   const g = gunBearing();
   if (!g.inArc || g.d > RANGE || reload > 0) return;
   reload = 6;
@@ -442,15 +447,75 @@ function fire(){
       hit: Math.random() < Math.max(.18, .8 - g.d / RANGE * .62) });
   }
 }
+// SHE FIRES BACK. Historically some of these galleons had their guns
+// struck below; here every Spaniard can shoot, because a fight is more
+// fun than a turkey shoot. She lays you when you are on her beam and
+// inside range, and cuts your rig and hull about.
+function prizeGunBearing(){
+  const dx = ship.x - prize.x, dy = ship.y - prize.y;
+  const rel = norm(Math.atan2(dx, -dy) - prize.hdg);
+  const a = Math.abs(rel) * 180/Math.PI;
+  return { inArc: a > 30 && a < 150, side: rel > 0 ? 1 : -1,
+           d: Math.hypot(dx, dy) };
+}
+function prizeFire(){
+  const g = prizeGunBearing();
+  if (prize.struck || g.d > RANGE || preload > 0) return;
+  preload = 9 + Math.random()*4;
+  const c = prize.cls;
+  const nG = Math.max(4, Math.floor(c.len / 6));
+  const fx = Math.sin(prize.hdg), fy = -Math.cos(prize.hdg);
+  const sx2 = Math.cos(prize.hdg), sy2 = Math.sin(prize.hdg);
+  sfxBroadside(nG);
+  for (let i = 0; i < nG; i++){
+    const along = -c.len*.26 + (i+.5)*(c.len*.5/nG);
+    const gx = prize.x + fx*along + sx2*g.side*c.beam*.5;
+    const gy = prize.y + fy*along + sy2*g.side*c.beam*.5;
+    for (let s2 = 0; s2 < 3; s2++)
+      smoke.push({ x: gx, y: gy, r: 2+Math.random()*2, a: .85,
+        vx: sx2*g.side*(6+Math.random()*5), vy: sy2*g.side*(6+Math.random()*5) });
+    const spread = (Math.random()-.5)*(g.d*.22+18);
+    pballs.push({ x: gx, y: gy, tx: ship.x + fx*spread*.4 + sx2*(Math.random()-.5)*26,
+      ty: ship.y + fy*spread*.4 + sy2*(Math.random()-.5)*26, t: 0,
+      dur: .28 + g.d/RANGE*.3,
+      hit: Math.random() < Math.max(.1, .42 - g.d/RANGE*.34) });
+  }
+}
+
 function combatStep(dt){
   reload = Math.max(0, reload - dt);
+  preload = Math.max(0, preload - dt);
+  // she fires back whenever she can, in chase or alongside, until she strikes
+  if (!prize.struck && (phase === "chase" || phase === "wait")) prizeFire();
+  // her shot, incoming
+  for (let i = pballs.length-1; i >= 0; i--){
+    const b = pballs[i]; b.t += dt;
+    if (b.t >= b.dur){
+      if (b.hit){
+        ship.rigDamage = Math.min(1, (ship.rigDamage||0) + .035);
+        ship.damage += .075;
+        smoke.push({ x: b.tx, y: b.ty, r: 1.6, a: .8,
+          vx: (Math.random()-.5)*4, vy: (Math.random()-.5)*4 });
+        sfxHit();
+      } else { splashes.push({ x: b.tx, y: b.ty, t: 0 }); }
+      pballs.splice(i, 1);
+    }
+  }
+  // she burns, once set alight: the fire grows and in a few seconds
+  // she is destroyed
+  if (burn > 0){
+    burn += dt;
+    for (let i = 0; i < 2; i++)
+      smoke.push({ x: prize.x + (Math.random()-.5)*prize.cls.beam,
+        y: prize.y + (Math.random()-.5)*prize.cls.len*.5, r: 3+Math.random()*3,
+        a: .7, vx: (Math.random()-.5)*3, vy: -4-Math.random()*4, fire: Math.random()<.4 });
+  }
   for (const s2 of smoke){
     s2.x += (s2.vx + env.curX*2) * dt; s2.y += (s2.vy + env.curY*2) * dt;
-    // and the wind takes it
     const wr = (env.windNow ?? env.windFrom) * Math.PI/180;
     s2.x += -Math.sin(wr) * 8 * dt; s2.y += Math.cos(wr) * 8 * dt;
     s2.vx *= 1 - dt*1.6; s2.vy *= 1 - dt*1.6;
-    s2.r += dt * 6; s2.a -= dt * .5;
+    s2.r += dt * 6; s2.a -= dt * (s2.fire ? .9 : .5);
   }
   smoke = smoke.filter(s2 => s2.a > 0);
   for (let i = balls.length-1; i >= 0; i--){
@@ -458,7 +523,7 @@ function combatStep(dt){
     b.t += dt;
     if (b.t >= b.dur){
       if (b.hit){
-        prize.rigDamage = Math.min(1, (prize.rigDamage||0) + .07);
+        prize.rigDamage = Math.min(1, (prize.rigDamage||0) + .09);
         smoke.push({ x: b.tx, y: b.ty, r: 1.6, a: .8,
           vx: (Math.random()-.5)*4, vy: (Math.random()-.5)*4 });
         sfxHit();
@@ -471,6 +536,8 @@ function combatStep(dt){
   }
   for (const sp of splashes) sp.t += dt;
   splashes = splashes.filter(sp => sp.t < .9);
+  for (const p of chestPops) p.t += dt;
+  chestPops = chestPops.filter(p => p.t < 1.1);
   if (!prize.struck && (prize.rigDamage||0) >= .75){
     prize.struck = true;
     phase = "struck";
@@ -501,14 +568,34 @@ function drawShots(){
     }
     ctx.globalAlpha = 1;
   }
+  ctx.fillStyle = "#222222";
+  for (const b of pballs){
+    const f = Math.min(1, b.t / b.dur);
+    const x = b.x + (b.tx - b.x) * f, y = b.y + (b.ty - b.y) * f;
+    ctx.beginPath(); ctx.arc(T.X(x), T.Y(y), Math.max(1, T.S(.4)), 0, Math.PI*2); ctx.fill();
+  }
   for (const s2 of smoke){
     ctx.globalAlpha = Math.max(0, s2.a) * .8;
-    ctx.fillStyle = "#f4f2ec";
+    ctx.fillStyle = s2.fire ? "#f2922a" : "#f4f2ec";
     ctx.beginPath();
     ctx.arc(T.X(s2.x), T.Y(s2.y), T.S(s2.r), 0, Math.PI*2);
     ctx.fill();
   }
   ctx.globalAlpha = 1;
+  // flames licking up off her when she burns
+  if (burn > 0){
+    for (let i = 0; i < 10; i++){
+      const fl = Math.sin(env.t*9 + i*1.7);
+      const fx = prize.x + (i/10 - .5) * prize.cls.len * .7;
+      const fy = prize.y + (Math.random()-.5) * prize.cls.beam;
+      ctx.globalAlpha = .5 + .4*Math.max(0, fl);
+      ctx.fillStyle = i % 2 ? "#ffb43a" : "#e8531c";
+      ctx.beginPath();
+      ctx.ellipse(T.X(fx), T.Y(fy), T.S(1.4), T.S(3 + 2*Math.max(0,fl)), 0, 0, Math.PI*2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
 }
 
 // --------------------------------------------------------------- AI
@@ -539,18 +626,18 @@ function prizeStep(dt){
 // so the game owns its audio outright: the sea bed, the guns, shot
 // striking home or falling short, canvas being worked, and the wreck.
 let A = null, sfxGain = null, seaGain = null, seaFilt = null;
-let windGain = null, windFilt = null, cannonBufs = [];
+let windGain = null, windFilt = null, shotBuf = null, cashBuf = null;
 function audioInit(){
   if (A) return;
   try { A = new (window.AudioContext || window.webkitAudioContext)(); } catch(e){ return; }
   if (A.state === "suspended") A.resume().catch(()=>{});
   sfxGain = A.createGain(); sfxGain.gain.value = 1; sfxGain.connect(A.destination);
-  // the broadside is HMS VICTORY herself: two cuts of her recorded
-  // rolling broadside, used whole, one per volley
-  for (const f of ["cannon.m4a", "cannon2.m4a"]){
-    fetch(f).then(r => r.arrayBuffer())
-      .then(b => A.decodeAudioData(b)).then(b => { cannonBufs.push(b); }).catch(()=>{});
-  }
+  // ONE clean cannon report (the single Victory shot) per broadside,
+  // and the cash register for treasure coming aboard
+  fetch("cannon-one.m4a").then(r => r.arrayBuffer())
+    .then(b => A.decodeAudioData(b)).then(b => { shotBuf = b; }).catch(()=>{});
+  fetch("cash.m4a").then(r => r.arrayBuffer())
+    .then(b => A.decodeAudioData(b)).then(b => { cashBuf = b; }).catch(()=>{});
   const len = A.sampleRate * 2;
   const buf = A.createBuffer(1, len, A.sampleRate);
   const d = buf.getChannelData(0);
@@ -628,32 +715,35 @@ function tone(type, f0, f1, dur, vol, delay){
   g.gain.exponentialRampToValueAtTime(0.0001, t0+dur);
   o.connect(g); g.connect(sfxGain); o.start(t0); o.stop(t0+dur+.03);
 }
-// A BROADSIDE: a real one. HMS Victory's rolling broadside, recorded,
-// played whole: the guns go off in succession down her side exactly as
-// they do in the game. Two cuts alternate so it never repeats exactly;
-// all-synth guns remain as the fallback while the clips decode.
+// A BROADSIDE: ONE cannon report, the single cut, with a deep synth
+// boom under it for weight. Not the long rolling recording.
 function sfxBroadside(nG){
   if (!A) return;
-  if (cannonBufs.length){
-    const s2 = A.createBufferSource();
-    s2.buffer = cannonBufs[(Math.random()*cannonBufs.length)|0];
-    s2.playbackRate.value = .96 + Math.random()*.08;
-    const g = A.createGain(); g.gain.value = .9;
+  if (shotBuf){
+    const s2 = A.createBufferSource(); s2.buffer = shotBuf;
+    s2.playbackRate.value = .94 + Math.random()*.12;
+    const g = A.createGain(); g.gain.value = .85;
     s2.connect(g); g.connect(sfxGain); s2.start();
-    return;
   }
-  for (let i = 0; i < nG; i++){
-    const dl = i * (.06 + Math.random()*.11);
-    tone("triangle", 85 + Math.random()*20, 32, .5, .5, dl);
-    playBuf(noiseBuf(.3, t2 => (1-t2)**2), .4, "lowpass", 620, 0, dl);
-    playBuf(noiseBuf(.06, t2 => (1-t2)**1.2), .22, "bandpass", 2100, 1.2, dl);
+  tone("triangle", 72 + Math.random()*14, 28, .5, .3);
+}
+// treasure over the rail: the cash register, cut short
+function sfxChest(){
+  if (cashBuf){
+    const s2 = A.createBufferSource(); s2.buffer = cashBuf;
+    s2.playbackRate.value = .97 + Math.random()*.08;
+    const g = A.createGain(); g.gain.value = .5;
+    s2.connect(g); g.connect(sfxGain); s2.start();
+  } else {
+    tone("sine", 1250, 900, .07, .06);
+    tone("sine", 1850, 1300, .05, .04, .03);
   }
 }
-// a chest coming over the rail: the clink, and the thud in the hold
-function sfxChest(){
-  tone("sine", 1250 + Math.random()*300, 900, .07, .06);
-  tone("sine", 1850 + Math.random()*350, 1300, .05, .04, .03);
-  tone("triangle", 140, 70, .16, .1, .05);
+// the ship catching fire, a soft roar that builds
+function sfxFire(){
+  if (!A) return;
+  playBuf(noiseBuf(1.6, t2 => Math.min(1, t2*3) * (1-t2*.3)), .3, "lowpass", 700);
+  tone("sawtooth", 60, 40, 1.4, .2);
 }
 // shot falling short: the sea closing over it
 function sfxSplash(){
@@ -723,11 +813,14 @@ function winCard(){
   music("marcha", false);
   music("grenadiers", true, .5);
   const took = Math.floor(ship.cargo);
-  card(`<h1>Away with the prize's gold</h1>
+  const fired = burn > 0;
+  card(`<h1>${fired ? "Her bones are burning" : "Away with the prize's gold"}</h1>
     <p>You stand clear with <b>${took} chests</b> of her treasure aboard, in
-    <b>${Math.floor(elapsed/60)}m ${Math.floor(elapsed%60)}s</b>, and left
-    <b>${hold}</b> in her hold that your ship could not stow or you would not
-    wait for.</p>
+    <b>${Math.floor(elapsed/60)}m ${Math.floor(elapsed%60)}s</b>.
+    ${fired
+      ? `You put your last broadside into her and left her <b>afire</b> on the
+         water, ${hold} chests and all, so no one would know what you had taken.`
+      : `You left <b>${hold}</b> chests in her hold that your ship could not stow.`}</p>
     <p class="src">Cavendish off this cape, 1587, took what the <i>Desire</i> could
     carry out of the <i>Santa Ana</i> and burned the rest: there was always more
     in a Manila ship than her takers could hold.</p>
@@ -770,8 +863,11 @@ addEventListener("keydown", e => {
   }
   if (k === " "){
     e.preventDefault();
-    if (phase === "wait" || phase === "chase" || phase === "struck") fire();
-    else if (phase === "board") castOff();
+    if (phase === "board") burnHer();          // fire her and run
+    else fire();                               // the broadside, any time
+  }
+  if (k === "c"){
+    if (phase === "board") castOff();          // take your gold and slip away
   }
   if (k === "escape") location.href = "index.html";
 });
@@ -812,13 +908,17 @@ function hud(){
         ? `<span class="g">SPACE &mdash; the ${g.side>0?"starboard":"larboard"} broadside</span>`
         : g.d <= RANGE
           ? '<span class="a">Lay her on your beam to bring the guns to bear</span>'
-          : "Guns ready"}</div>`;
+          : "Guns ready"}</div>
+    ${(ship.damage > .02 || (ship.rigDamage||0) > .02) ? `<div class="r">Your ship: ${
+      ship.damage > .66 ? "sorely battered" : ship.damage > .3 ? "knocked about" : "taking hits"}${
+      (ship.rigDamage||0) > .05 ? ", rigging cut" : ""}</div>` : ""}`;
   el("chase").innerHTML =
     phase === "board" ? `
     <div>Treasure aboard <b>${Math.floor(ship.cargo)}</b> / ${cls.cap} chests</div>
     <div>Left in her hold <b>${hold}</b></div>
     <div class="a">Every chest slows you</div>
-    <div class="g">SPACE &mdash; cast off and run</div>`
+    <div class="g">C &mdash; cast off and run with your gold</div>
+    <div class="r">SPACE &mdash; fire her and leave her burning</div>`
     : phase === "escape" ? `
     <div>Treasure aboard <b>${Math.floor(ship.cargo)}</b> / ${cls.cap} chests</div>
     <div>Get clear <b>${Math.max(0, 750 - Math.round(d))} yd</b> to go</div>`
@@ -831,9 +931,9 @@ function hud(){
          : (prize.rigDamage||0) > .01 ? ((prize.rigDamage*100).toFixed(0) + "% cut up") : "whole"}</b></div>` : "";
   const orders = {
     wait: "Lie quiet. She is coming down the coast from the north-west; you will raise her topsails first. Work out to the point as she comes on, and do not let the arch rocks have you.",
-    chase: "Run her down. Keep the wind on your quarter, point your bowsprit where she will be, and when you are inside four hundred yards lay her on your beam and give her the broadside.",
+    chase: "Run her down and lay her on your beam for the broadside, but mind her own guns: she will fire back. Cut her rig up until she strikes.",
     struck: "She has struck her colours. Lay her aboard: close alongside and the grapnels will do the rest.",
-    board: "The grapnels are in her rail and the chests are coming over. Every one is money and every one is weight. Cast off when you have had enough, or when you dare not stay.",
+    board: "The grapnels are in her rail and the chests are coming over. Press C to cast off with your gold, or SPACE to fire her and leave her burning on the water.",
     escape: "Cast off and get clear, heavy as she is. Make for the open sea.",
   };
   el("phase").textContent = {wait:"The ambush", chase:"The chase", struck:"She has struck",
@@ -862,6 +962,63 @@ function drawSailMark(){
   ctx.globalAlpha = 1;
 }
 
+// a little side-elevation of YOUR ship, filling with gold as you loot,
+// the way doghole shows the deckload growing
+function drawTreasureInset(){
+  const bw = Math.min(260, W*.24), bx = W - bw - 30, by = H - 150;
+  const k = bw / 60;
+  ctx.save();
+  ctx.globalAlpha = .9;
+  // a backing panel
+  ctx.fillStyle = "rgba(10,28,36,.5)";
+  ctx.fillRect(bx - 14, by - 54, bw + 28, 96);
+  // the hull in profile
+  const hy = by;
+  ctx.fillStyle = "#3b2512";
+  ctx.beginPath();
+  ctx.moveTo(bx, hy);
+  ctx.quadraticCurveTo(bx - 6*k*.2, hy + 14, bx + 8*k*.2, hy + 16);
+  ctx.lineTo(bx + bw - 8*k*.2, hy + 16);
+  ctx.quadraticCurveTo(bx + bw + 4*k*.2, hy + 8, bx + bw, hy - 2);
+  ctx.lineTo(bx, hy - 2);
+  ctx.closePath(); ctx.fill();
+  // three stub masts
+  ctx.strokeStyle = "#241a0c"; ctx.lineWidth = 2;
+  for (const f of [.2, .5, .8]){
+    ctx.beginPath(); ctx.moveTo(bx + bw*f, hy); ctx.lineTo(bx + bw*f, by - 46); ctx.stroke();
+  }
+  // the hold, filling with chests
+  const frac = ship.cargo / cls.cap;
+  const cols = 10, rows = 3;
+  const cw = (bw - 16) / cols, chh = 13;
+  let n = Math.round(frac * cols * rows);
+  for (let r2 = 0; r2 < rows; r2++){
+    for (let c2 = 0; c2 < cols; c2++){
+      if (n <= 0) break;
+      ctx.fillStyle = (c2 + r2) % 2 ? "#c8781f" : "#f2a63c";
+      ctx.fillRect(bx + 8 + c2*cw, hy - 4 - (r2+1)*chh*.9, cw - 2, chh*.7);
+      n--;
+    }
+  }
+  ctx.fillStyle = "#e7eef4";
+  ctx.font = "13px " + getComputedStyle(document.body).fontFamily;
+  ctx.textAlign = "right";
+  ctx.fillText(`${Math.floor(ship.cargo)} / ${cls.cap} chests aboard`, bx + bw, by - 44);
+  ctx.restore();
+}
+function drawChestPops(){
+  ctx.save();
+  ctx.textAlign = "center";
+  for (const p of chestPops){
+    const f = p.t / 1.1;
+    ctx.globalAlpha = Math.max(0, 1 - f);
+    ctx.fillStyle = "#f2d64a";
+    ctx.font = `${Math.round(T.S(5))}px ` + getComputedStyle(document.body).fontFamily;
+    ctx.fillText("+1 chest", T.X(ship.x), T.Y(ship.y) - T.S(6) - f*40);
+  }
+  ctx.globalAlpha = 1;
+  ctx.restore();
+}
 function drawRose(){
   const R = Math.min(90, W*.07), cx = W - R - 34, cy = 210 + R;
   ctx.save();
@@ -941,6 +1098,7 @@ function boardStep(dt){
       chestT = 0;
       chestFly = { f: 0 };
       ship.cargo += 1; hold -= 1;
+      chestPops.push({ t: 0 });
       sfxChest();
     }
   }
@@ -954,6 +1112,15 @@ function castOff(){
   phase = "escape";
   if (A) playBuf(noiseBuf(.4, t2 => (1-t2)**1.6), .14, "bandpass", 2400, .7);
 }
+// fire her: a broadside into the prize at point blank, the grapnels cut,
+// and she is left burning as you sheer off
+function burnHer(){
+  sfxBroadside(8);
+  sfxFire();
+  burn = 0.0001;
+  ship.warp = null; ship.lines = 0; chestFly = null;
+  phase = "escape";
+}
 
 // ------------------------------------------------------------- phases
 function phasesStep(dt){
@@ -966,6 +1133,11 @@ function phasesStep(dt){
   }
   if (phase === "board") boardStep(dt);
   if (phase === "escape" && d > 750) winCard();
+  // beaten off: she has cut you up too badly to go on
+  if ((phase === "chase" || phase === "wait") && ship.damage > 1.5){
+    failCard("She has beaten you off",
+      "The galleon's guns cut your rigging and hull to pieces. She holds her course for Acapulco while you lie licking your wounds.");
+  }
 }
 
 // -------------------------------------------------------------- loop
@@ -1040,6 +1212,8 @@ function frame(now){
     }
   }
   drawShots();
+  if (phase === "board") drawTreasureInset();
+  drawChestPops();
   if (phase !== "brief" && phase !== "over"){ drawSailMark(); drawRose(); }
   try { hud(); } catch (err) {
     window.__hudErr = window.__hudErr || [];

@@ -31,7 +31,6 @@
     <div class="caps"><b>1</b> Drake &middot; <b>2</b> Cavendish &middot; <b>3</b> Rogers &middot; <b>4</b> Anson</div>
   </div>
 </div>
-<audio id="theme" src="theme-britannia.m4a" loop preload="auto"></audio>
 <audio id="shot" src="cannon-one.m4a" preload="auto"></audio>
 
 <script>
@@ -84,21 +83,6 @@ function drawSky(t){
   halo.addColorStop(1, "rgba(255,244,200,0)");
   ctx.fillStyle = halo;
   ctx.fillRect(sx-H*.3, sy-H*.3, H*.6, H*.6);
-  // shafts of light fanning down from it
-  ctx.save();
-  ctx.translate(sx, sy);
-  for (let i = 0; i < 7; i++){
-    const a = .9 + i*.16 + Math.sin(t*.05+i)*.02;
-    ctx.globalAlpha = .05 + .03*Math.sin(t*.3+i);
-    ctx.fillStyle = "#fff6d8";
-    ctx.beginPath();
-    ctx.moveTo(0,0);
-    ctx.lineTo(Math.cos(a)*H*1.2, Math.sin(a)*H*1.2);
-    ctx.lineTo(Math.cos(a+.05)*H*1.2, Math.sin(a+.05)*H*1.2);
-    ctx.closePath(); ctx.fill();
-  }
-  ctx.restore();
-  ctx.globalAlpha = 1;
   ctx.fillStyle = "#fffbe8";
   ctx.beginPath(); ctx.arc(sx, sy, H*.035, 0, Math.PI*2); ctx.fill();
 
@@ -119,14 +103,17 @@ function drawSky(t){
   }
   ctx.globalAlpha = 1;
 
-  // a skein of frigatebirds riding the sea breeze
-  ctx.strokeStyle = "rgba(40,54,66,.55)";
-  ctx.lineWidth = Math.max(1, H*.0016);
-  for (let i = 0; i < 7; i++){
-    const bx = ((i*.17 + .3 - t*.012) % 1.25) * W;
-    const by = H*(.10 + .035*Math.sin(i*2.1)) + Math.sin(t*.5+i)*H*.004;
-    const s = H*.012 * (1 - i*.05);
-    const flap = Math.sin(t*3 + i*1.3) * .4;
+  // the odd bird passing: two gulls crossing on a long slow cycle, so
+  // the sky is alive but not busy
+  ctx.strokeStyle = "rgba(40,54,66,.5)";
+  ctx.lineWidth = Math.max(1, H*.0017);
+  for (let i = 0; i < 2; i++){
+    const cycle = (t*.02 + i*.5) % 1;
+    if (cycle > .7) continue;                        // mostly empty sky
+    const bx = (cycle/.7) * W*1.2 - W*.1;
+    const by = H*(.12 + i*.05) + Math.sin(t*.4+i)*H*.006;
+    const s = H*.011;
+    const flap = Math.sin(t*3.5 + i*2) * .45;
     ctx.beginPath();
     ctx.moveTo(bx - s, by + s*flap);
     ctx.quadraticCurveTo(bx - s*.3, by - s*.5, bx, by);
@@ -202,47 +189,6 @@ function drawCape(t){
   ctx.lineTo(ax - aw*1.25, hz - ah*.42);
   ctx.lineTo(ax - aw*.95, hz);
   ctx.closePath(); ctx.fill();
-
-  // a Spanish watchtower on the ridge, keeping its useless watch
-  const wx = bx + W*.052, wy = hz - H*.138;
-  ctx.fillStyle = "#cdb98f";
-  ctx.fillRect(wx, wy, W*.012, H*.055);
-  ctx.fillStyle = "#b09a6e";
-  ctx.fillRect(wx, wy, W*.012, H*.012);           // the parapet
-  ctx.fillStyle = "#6b5330";
-  for (let i = 0; i < 3; i++) ctx.fillRect(wx + i*W*.0045, wy - H*.004, W*.002, H*.004);
-  ctx.strokeStyle = "#8a6a3a"; ctx.lineWidth = Math.max(1, H*.0016);
-  ctx.beginPath(); ctx.moveTo(wx+W*.006, wy); ctx.lineTo(wx+W*.006, wy-H*.02); ctx.stroke();
-
-  // cardon cacti along the ridge, the Baja giant
-  ctx.strokeStyle = "#5f7347"; ctx.lineCap = "round";
-  for (let i = 0; i < 9; i++){
-    const f = i/9;
-    const cx2 = bx + W*(.01 + f*.09), cy = hz - H*(.06 + .07*Math.sin(f*7+1));
-    const ch2 = H*(.02 + .015*((i*7)%3));
-    ctx.lineWidth = Math.max(1.4, H*.004);
-    ctx.beginPath(); ctx.moveTo(cx2, cy); ctx.lineTo(cx2, cy - ch2); ctx.stroke();
-    ctx.lineWidth = Math.max(1, H*.003);          // the arms
-    ctx.beginPath();
-    ctx.moveTo(cx2, cy - ch2*.55); ctx.lineTo(cx2 - ch2*.3, cy - ch2*.55);
-    ctx.lineTo(cx2 - ch2*.3, cy - ch2*.85);
-    ctx.moveTo(cx2, cy - ch2*.4); ctx.lineTo(cx2 + ch2*.28, cy - ch2*.4);
-    ctx.lineTo(cx2 + ch2*.28, cy - ch2*.7);
-    ctx.stroke();
-  }
-
-  // the sandy spit curling off the point into the bay
-  ctx.fillStyle = "#f2e4b6";
-  ctx.beginPath();
-  ctx.moveTo(bx, hz);
-  ctx.quadraticCurveTo(bx - W*.04, hz + H*.012, bx - W*.11, hz + H*.004);
-  ctx.quadraticCurveTo(bx - W*.05, hz + H*.028, bx + W*.02, hz + H*.02);
-  ctx.closePath(); ctx.fill();
-  ctx.strokeStyle = "rgba(255,255,255,.7)"; ctx.lineWidth = Math.max(1, H*.0018);
-  ctx.beginPath();
-  ctx.moveTo(bx - W*.11, hz + H*.005);
-  ctx.quadraticCurveTo(bx - W*.05, hz + H*.029, bx + W*.02, hz + H*.021);
-  ctx.stroke();
 }
 
 // ------------------------------------------------------------ the sea
@@ -291,245 +237,297 @@ function drawSea(t){
 }
 
 // ------------------------------------------------------- a ship, side on
-// Parametric profile painter. kind: "english" or "galleon".
-// x,y = waterline midpoint on screen; s = scale (hull length px);
-// face = 1 drawn bow to the right, -1 bow to the left.
+// Parametric profile painter, drawn for the WOODES ROGERS era, 1709:
+// kind "english" is a Bristol privateer like his Duke, a low flush-
+// decked frigate; "galleon" is the Manila ship, high-charged aft. Flags
+// are correct for the year: the English wear the RED ENSIGN (the 1707
+// first-union canton on a red field) aft and the UNION JACK at the bow;
+// the Spaniard wears the CROSS OF BURGUNDY, used at sea until 1785.
+// x,y = waterline midpoint; s = hull length px; face = 1 bow right.
+
+// --- flags that actually fly: each flag is painted once to a texture,
+// then blitted in vertical columns with a travelling wave, so the cloth
+// AND the device on it ripple together instead of the symbol sitting
+// flat inside a wobbling outline.
+const flagTex = {};
+function makeFlagTex(key, paint){
+  if (flagTex[key]) return flagTex[key];
+  const TW = 128, TH = 80;
+  const c = document.createElement("canvas"); c.width = TW; c.height = TH;
+  const g = c.getContext("2d");
+  paint(g, TW, TH);
+  flagTex[key] = c; return c;
+}
+// the 1606/1707 first union: blue field, white saltire, red cross, into g
+function paintUnion(g, x, y, w, h){
+  g.fillStyle = "#1c2a6b"; g.fillRect(x, y, w, h);
+  g.strokeStyle = "#f4f4f4"; g.lineWidth = h*.2;
+  g.beginPath();
+  g.moveTo(x, y); g.lineTo(x+w, y+h); g.moveTo(x, y+h); g.lineTo(x+w, y); g.stroke();
+  g.strokeStyle = "#c62828"; g.lineWidth = h*.24;
+  g.beginPath();
+  g.moveTo(x+w/2, y); g.lineTo(x+w/2, y+h);
+  g.moveTo(x, y+h/2); g.lineTo(x+w, y+h/2); g.stroke();
+}
+function texRedEnsign(){ return makeFlagTex("red", (g,W,H) => {
+  g.fillStyle = "#b11f1f"; g.fillRect(0,0,W,H);
+  paintUnion(g, 0, 0, W*.5, H*.5);                 // canton at the hoist-top
+}); }
+function texUnionJack(){ return makeFlagTex("jack", (g,W,H) => paintUnion(g,0,0,W,H)); }
+function texBurgundy(){ return makeFlagTex("burg", (g,W,H) => {
+  g.fillStyle = "#f3ecda"; g.fillRect(0,0,W,H);
+  g.strokeStyle = "#b3362a"; g.lineWidth = H*.14; g.lineCap = "round";
+  // a ragged saltire: two slightly jagged diagonals
+  for (const [sx,sy,ex,ey] of [[0,0,W,H],[0,H,W,0]]){
+    g.beginPath(); g.moveTo(sx,sy);
+    g.lineTo((sx+ex)/2 + (sy<ey?6:-6), (sy+ey)/2); g.lineTo(ex,ey); g.stroke();
+  }
+}); }
+// blit a flag texture flying from the staff at (x,y) toward -x (leeward),
+// rippling. w,h = flag size; t drives the wave.
+function flyFlag(tex, x, y, w, h, t, seed){
+  const N = 20, TW = tex.width, TH = tex.height;
+  for (let i = 0; i < N; i++){
+    const f0 = i/N, f1 = (i+1)/N;
+    const amp = f0 * h*.22;                          // the free end moves most
+    const wv = Math.sin(f0*7 - t*6 + seed);
+    const dy = y + wv*amp;
+    const sq = 1 + .12*Math.cos(f0*7 - t*6 + seed);  // columns squash a little
+    ctx.save();
+    ctx.globalAlpha = .9 - .25*Math.max(0,-wv);      // troughs sit in shadow
+    ctx.drawImage(tex, f0*TW, 0, (f1-f0)*TW, TH,
+                  x - f1*w, dy - h/2*sq, w/N + .5, h*sq);
+    ctx.restore();
+  }
+}
+function pennant(x, y, len, col, t, seed){
+  ctx.strokeStyle = col; ctx.lineWidth = Math.max(1.2, len*.06);
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  ctx.quadraticCurveTo(x - len*.5, y + Math.sin(t*4+seed)*len*.08,
+                       x - len, y + len*.03 + Math.sin(t*4+seed+1)*len*.12);
+  ctx.stroke();
+}
+
 function drawProfileShip(kind, x, y, s, face, t, ph){
   const gal = kind === "galleon";
-  const bob = Math.sin(t*.9 + ph) * s*.012;
-  const roll = Math.sin(t*.7 + ph*2) * .015;
+  const bob = Math.sin(t*.9 + ph) * s*.01;
+  const roll = Math.sin(t*.7 + ph*2) * .012;
   ctx.save();
   ctx.translate(x, y + bob);
   ctx.scale(face, 1);
   ctx.rotate(roll);
 
-  const L = s;                       // hull length on screen
-  const hullH = s * (gal ? .16 : .12);     // freeboard
-  const sheer = s * (gal ? .09 : .055);    // how the ends rise
+  const L = s;
+  const free = s * (gal ? .085 : .07);        // freeboard at midships
+  const deck = -free;                          // main deck line, midships
+  const sBow = deck - s*(gal ? .05 : .035);    // sheer rises toward the bow
+  const sStern = deck - s*(gal ? .085 : .05);  // and more toward the stern
+  const keel = s*(gal ? .072 : .06);           // depth of keel below water
+  const col = {
+    hull: gal ? "#5a3a1e" : "#4a3018", hullLo: gal ? "#3f2814" : "#33210f",
+    band: gal ? "#9c5a2a" : "#6f4a22", wale: gal ? "#caa060" : "#a07a44",
+    works: gal ? "#8a5228" : "#6b4a24", gild: "#e3b54a",
+  };
 
-  // reflection first, under everything
-  ctx.save();
-  ctx.scale(1, -1);
-  ctx.globalAlpha = .14;
-  ctx.fillStyle = gal ? "#4a2e16" : "#331f10";
-  ctx.fillRect(-L*.48, -hullH*.1, L*.95, hullH*.9);
+  // reflection
+  ctx.save(); ctx.scale(1,-1); ctx.globalAlpha = .12;
+  ctx.fillStyle = col.hullLo; ctx.fillRect(-L*.46, -keel, L*.92, keel*.8);
   ctx.restore();
 
-  // ---- hull, dark below the wale, warm above
-  const deckY = -hullH;
-  ctx.fillStyle = gal ? "#4f3016" : "#3b2512";
+  // ---- HULL: a long low profile. Raked stem and beakhead forward, a
+  //      transom stern aft, the sheer sweeping up at both ends.
   ctx.beginPath();
-  ctx.moveTo(-L*.5, deckY + sheer*.2);             // stern rail
-  ctx.quadraticCurveTo(-L*.52, hullH*.25, -L*.42, hullH*.32);  // sternpost
-  ctx.lineTo(L*.4, hullH*.34);                     // keel run
-  ctx.quadraticCurveTo(L*.52, hullH*.2, L*.5, deckY + sheer*(gal ? .5 : .35)); // stem
-  ctx.lineTo(L*.44, deckY - sheer*.15);
-  ctx.lineTo(-L*.44, deckY - sheer*.05);
-  ctx.closePath(); ctx.fill();
+  ctx.moveTo(L*.52, sBow);                                    // stem head
+  ctx.quadraticCurveTo(L*.56, deck+free*.4, L*.48, keel*.35); // forefoot
+  ctx.quadraticCurveTo(L*.44, keel, L*.3, keel);              // down to keel
+  ctx.lineTo(-L*.34, keel);                                   // the long keel
+  ctx.quadraticCurveTo(-L*.46, keel*.95, -L*.47, keel*.2);    // sternpost
+  ctx.lineTo(-L*.5, sStern);                                  // up the transom
+  ctx.lineTo(-L*.46, sStern);
+  // the sheer line, deck edge, sweeping bow to stern
+  ctx.quadraticCurveTo(-L*.1, deck+s*.012, L*.2, deck);
+  ctx.quadraticCurveTo(L*.42, deck-s*.004, L*.52, sBow);
+  ctx.closePath();
+  ctx.fillStyle = col.hull; ctx.fill();
 
-  // the wale: a pale strake along her whole side
-  ctx.strokeStyle = gal ? "#c89858" : "#a87f46";
-  ctx.lineWidth = Math.max(1.5, s*.012);
+  // the underbody, darker below the waterline
+  ctx.save();
+  ctx.beginPath(); ctx.rect(-L*.5, 0, L, keel+2); ctx.clip();
+  ctx.fillStyle = col.hullLo;
   ctx.beginPath();
-  ctx.moveTo(-L*.48, deckY + hullH*.42);
-  ctx.quadraticCurveTo(0, deckY + hullH*.56, L*.47, deckY + hullH*.3);
+  ctx.moveTo(L*.5, 0); ctx.quadraticCurveTo(L*.44, keel, L*.3, keel);
+  ctx.lineTo(-L*.34, keel); ctx.quadraticCurveTo(-L*.46, keel*.95, -L*.47, keel*.2);
+  ctx.lineTo(-L*.47, 0); ctx.closePath(); ctx.fill();
+  ctx.restore();
+
+  // the painted gunport strake and the wales running her length
+  const strakeY = deck + free*.5;
+  ctx.strokeStyle = col.band; ctx.lineWidth = s*(gal?.05:.042); ctx.lineCap = "butt";
+  ctx.beginPath();
+  ctx.moveTo(-L*.47, strakeY + s*.004);
+  ctx.quadraticCurveTo(0, strakeY + s*.02, L*.5, strakeY - s*.002);
   ctx.stroke();
-
-  // gunports, a black row along the wale
-  const nP = gal ? 7 : 6;
-  ctx.fillStyle = "#17100a";
-  for (let i = 0; i < nP; i++){
-    const f = -.36 + i * (.72 / (nP-1));
-    const py = deckY + hullH*.46 + f*f * hullH*.1;
-    ctx.fillRect(L*f - s*.013, py, s*.026, s*.022);
+  ctx.strokeStyle = col.wale; ctx.lineWidth = Math.max(1.5, s*.009);
+  for (const off of [free*.2, free*.72]){
+    ctx.beginPath();
+    ctx.moveTo(-L*.47, deck + off);
+    ctx.quadraticCurveTo(0, deck + off + s*.016, L*.5, deck + off - s*.006);
+    ctx.stroke();
   }
 
-  // ---- castles
-  ctx.fillStyle = gal ? "#8a4f26" : "#6b4a24";
+  // ---- gunports: square lids open, red inside, a muzzle run out
+  const nP = gal ? 9 : 7;
+  for (let i = 0; i < nP; i++){
+    const f = -.34 + i*(.68/(nP-1));
+    const px = L*f, py = strakeY - s*.006 + f*f*s*.01;
+    ctx.fillStyle = "#15100a"; ctx.fillRect(px - s*.013, py, s*.026, s*.022);
+    ctx.fillStyle = "#8a1410"; ctx.fillRect(px - s*.013, py - s*.015, s*.026, s*.013);
+    ctx.strokeStyle = "rgba(20,12,6,.6)"; ctx.lineWidth = Math.max(.6, s*.0025);
+    ctx.strokeRect(px - s*.013, py, s*.026, s*.022);
+    ctx.fillStyle = "#0b0908"; ctx.fillRect(px - s*.003, py + s*.006, s*.016, s*.006);
+  }
+
+  // ---- upperworks: a raised quarterdeck aft and forecastle forward,
+  //      sitting above the sheer, with an open waist between
+  ctx.fillStyle = col.works;
   if (gal){
-    // the towering sterncastle, two steps
-    ctx.fillRect(-L*.5, deckY - s*.1, L*.17, s*.1);
-    ctx.fillRect(-L*.5, deckY - s*.17, L*.1, s*.07);
-    // forecastle
-    ctx.fillRect(L*.3, deckY - s*.055, L*.14, s*.055);
-    // gilding lines on the stern
-    ctx.strokeStyle = "#e3b54a"; ctx.lineWidth = Math.max(1, s*.006);
+    // the high charged sterncastle, stepped, and a tall beakhead
     ctx.beginPath();
-    ctx.moveTo(-L*.5, deckY - s*.1); ctx.lineTo(-L*.33, deckY - s*.1);
-    ctx.moveTo(-L*.5, deckY - s*.035); ctx.lineTo(-L*.33, deckY - s*.035);
-    ctx.moveTo(-L*.5, deckY - s*.17); ctx.lineTo(-L*.4, deckY - s*.17);
-    ctx.stroke();
-    // stern lantern
-    ctx.fillStyle = "#e3b54a";
-    ctx.beginPath(); ctx.arc(-L*.515, deckY - s*.19, s*.012, 0, Math.PI*2); ctx.fill();
-    // the gallery: two rows of lit windows across the sterncastle
-    ctx.fillStyle = "#f3d27c";
-    for (let r2 = 0; r2 < 2; r2++){
-      for (let wnd = 0; wnd < 4 - r2; wnd++){
-        ctx.fillRect(-L*.485 + wnd*L*.036, deckY - s*.085 - r2*s*.062,
-                     s*.018, s*.026);
+    ctx.moveTo(-L*.5, sStern); ctx.lineTo(-L*.5, sStern - s*.14);
+    ctx.lineTo(-L*.3, sStern - s*.1); ctx.lineTo(-L*.28, deck); ctx.closePath(); ctx.fill();
+    ctx.fillRect(-L*.5, sStern - s*.14, L*.12, s*.06);        // the poop
+    ctx.fillStyle = col.gild; 
+    for (const yy of [sStern - s*.01, sStern - s*.06, sStern - s*.11]){
+      ctx.fillRect(-L*.5, yy, L*.2, Math.max(1,s*.006));
+    }
+    ctx.fillStyle = "#f3d27c";                                // stern windows
+    for (let r2=0;r2<2;r2++) for (let c2=0;c2<4-r2;c2++)
+      ctx.fillRect(-L*.485 + c2*s*.03, sStern - s*.035 - r2*s*.05, s*.016, s*.024);
+    ctx.fillStyle = col.gild;                                 // stern lantern
+    ctx.beginPath(); ctx.arc(-L*.505, sStern - s*.155, s*.012, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = col.works;
+    ctx.fillRect(L*.26, deck - s*.06, L*.16, s*.06);          // forecastle
+  } else {
+    // a trim privateer: a low quarterdeck and a short forecastle
+    ctx.beginPath();
+    ctx.moveTo(-L*.47, sStern); ctx.lineTo(-L*.47, sStern - s*.06);
+    ctx.lineTo(-L*.24, sStern - s*.05); ctx.lineTo(-L*.22, deck); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "#cdbb90";                                // quarter windows
+    for (let c2=0;c2<3;c2++) ctx.fillRect(-L*.45 + c2*s*.03, sStern - s*.04, s*.016, s*.02);
+    ctx.fillStyle = col.works;
+    ctx.fillRect(L*.26, deck - s*.04, L*.14, s*.04);          // forecastle
+    // the open waist rail on stanchions
+    ctx.strokeStyle = col.works; ctx.lineWidth = Math.max(1, s*.004);
+    ctx.beginPath(); ctx.moveTo(-L*.22, deck - s*.025); ctx.lineTo(L*.26, deck - s*.025); ctx.stroke();
+    for (let i=0;i<10;i++){ const rx=-L*.2+i*L*.046;
+      ctx.beginPath(); ctx.moveTo(rx, deck); ctx.lineTo(rx, deck - s*.025); ctx.stroke(); }
+  }
+
+  // ---- beakhead and headrails, raked out under the bowsprit
+  ctx.fillStyle = col.works;
+  ctx.beginPath();
+  ctx.moveTo(L*.5, deck + free*.3);
+  ctx.quadraticCurveTo(L*.64, deck + free*.1, L*.66, deck - s*.04);
+  ctx.lineTo(L*.5, deck - s*.02); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = col.gild;                                   // a gilt figurehead
+  ctx.beginPath(); ctx.ellipse(L*.63, deck - s*.01, s*.016, s*.024, -.5, 0, Math.PI*2); ctx.fill();
+
+  // ---- channels with deadeyes outboard, where the shrouds set up
+  const mastX = gal ? [-L*.3, L*.02, L*.3] : [-L*.29, L*.03, L*.31];
+  const mastH = gal ? [s*.4, s*.56, s*.42] : [s*.4, s*.54, s*.4];
+  ctx.strokeStyle = "#2e2110"; ctx.lineWidth = Math.max(1, s*.004);
+  for (const cx3 of mastX){
+    ctx.beginPath(); ctx.moveTo(cx3 - L*.028, deck + free*.3); ctx.lineTo(cx3 + L*.028, deck + free*.3); ctx.stroke();
+    ctx.fillStyle = "#1c140a";
+    for (let d2=-2; d2<=2; d2++){ ctx.beginPath(); ctx.arc(cx3+d2*L*.011, deck+free*.33, s*.0035, 0, Math.PI*2); ctx.fill(); }
+  }
+
+  // ---- masts and canvas. Square sails are gently bellied TRAPEZOIDS,
+  //      taller than wide, not round balloons.
+  const windLean = .05;
+  for (let m = 0; m < 3; m++){
+    const mx = mastX[m], mh = mastH[m], top = deck - mh;
+    ctx.strokeStyle = "#241a0c"; ctx.lineWidth = Math.max(2, s*.015);
+    ctx.beginPath(); ctx.moveTo(mx, deck + s*.005); ctx.lineTo(mx + mh*windLean*.4, top); ctx.stroke();
+    ctx.fillStyle = "#2e2110";                                // a top platform
+    ctx.fillRect(mx + mh*windLean*.24 - s*.018, deck - mh*.56, s*.036, s*.009);
+
+    if (m === 0){
+      // a lateen mizzen, period for 1709: a tall narrow triangle aft
+      ctx.strokeStyle = "#2e2110"; ctx.lineWidth = Math.max(1.2, s*.008);
+      ctx.beginPath(); ctx.moveTo(mx - L*.15, deck - mh*.28); ctx.lineTo(mx + L*.08, deck - mh*.98); ctx.stroke();
+      ctx.fillStyle = "rgba(244,236,214,.95)";
+      ctx.beginPath();
+      ctx.moveTo(mx - L*.14, deck - mh*.3);
+      ctx.lineTo(mx + L*.065, deck - mh*.94);
+      ctx.quadraticCurveTo(mx + L*.01, deck - mh*.38, mx - L*.03, deck - mh*.18);
+      ctx.closePath(); ctx.fill();
+    } else {
+      const baseW = m === 1 ? L*.24 : L*.19;
+      const SPANS = m === 1
+        ? [[.05, .42, 1], [.46, .74, .86], [.78, .97, .64]]   // course, topsail, t'gallant
+        : [[.06, .46, 1], [.5, .9, .78]];
+      for (const [fB, fT, wf] of SPANS){
+        const yT = deck - mh*fT, yB = deck - mh*fB;
+        const hT = baseW*wf*.46, hB = baseW*wf*.5, belly = baseW*wf*.1;
+        ctx.strokeStyle = "#2e2110"; ctx.lineWidth = Math.max(1.2, s*.008);
+        ctx.beginPath(); ctx.moveTo(mx - hT, yT); ctx.lineTo(mx + hT, yT); ctx.stroke();
+        const grad = ctx.createLinearGradient(mx - hB, 0, mx + hB, 0);
+        grad.addColorStop(0, "#fbf6ea"); grad.addColorStop(.5, "#eee3c9"); grad.addColorStop(1, "#dccfae");
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.moveTo(mx - hT, yT);
+        ctx.quadraticCurveTo(mx - hB - belly, (yT+yB)/2, mx - hB, yB);        // leeward belly
+        ctx.quadraticCurveTo(mx, yB + belly*.5, mx + hB, yB);                 // scalloped foot
+        ctx.quadraticCurveTo(mx + hB + belly*.3, (yT+yB)/2, mx + hT, yT);
+        ctx.closePath(); ctx.fill();
+        // bolt-rope edge and a reef band
+        ctx.strokeStyle = "rgba(120,100,70,.4)"; ctx.lineWidth = Math.max(.6, s*.003);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(mx - hB*.82, yB - (yB-yT)*.34);
+        ctx.quadraticCurveTo(mx, yB - (yB-yT)*.3, mx + hB*.82, yB - (yB-yT)*.34); ctx.stroke();
       }
     }
-    // an ochre band the length of her upper works
-    ctx.fillStyle = "rgba(170,90,40,.55)";
-    ctx.fillRect(-L*.44, deckY - sheer*.02, L*.86, hullH*.2);
-  } else {
-    // race-built: low castles, a clean sheer
-    ctx.fillRect(-L*.48, deckY - s*.05, L*.15, s*.05);
-    ctx.fillRect(L*.3, deckY - s*.035, L*.12, s*.035);
+    // shrouds and ratlines
+    ctx.strokeStyle = "rgba(40,28,14,.5)"; ctx.lineWidth = Math.max(.6, s*.0025);
+    const foot = [-.05,-.032,.032,.05];
+    for (const dxr of foot){ ctx.beginPath(); ctx.moveTo(mx + L*dxr*1.2, deck); ctx.lineTo(mx + mh*windLean*.3, top + mh*.44); ctx.stroke(); }
+    for (let rl=1; rl<=4; rl++){ const fr=rl/5;
+      ctx.beginPath();
+      ctx.moveTo(mx + L*foot[0]*1.2*(1-fr), deck + (top+mh*.44 - deck)*fr);
+      ctx.lineTo(mx + L*foot[3]*1.2*(1-fr), deck + (top+mh*.44 - deck)*fr); ctx.stroke(); }
+    if (m >= 1) pennant(mx + mh*windLean*.4, top, s*.15, gal ? "#c62828" : "#b11f1f", t, m);
   }
 
-  // the beakhead under the bowsprit
-  ctx.fillStyle = gal ? "#8a4f26" : "#6b4a24";
-  ctx.beginPath();
-  ctx.moveTo(L*.5, deckY + sheer*.4);
-  ctx.quadraticCurveTo(L*.6, deckY + sheer*.3, L*.62, deckY - sheer*.1);
-  ctx.lineTo(L*.5, deckY - sheer*.05);
-  ctx.closePath(); ctx.fill();
-
-  // ---- masts, sails, rigging
-  const mastX = gal ? [-L*.31, L*.02, L*.3] : [-L*.3, L*.04, L*.32];
-  const mastH = gal ? [s*.42, s*.56, s*.4] : [s*.4, s*.52, s*.38];
-  const windLean = .06;                           // canvas bellies to the left
-  for (let m = 0; m < 3; m++){
-    const mx = mastX[m], mh = mastH[m], top = deckY - mh;
-    ctx.strokeStyle = "#241a0c";
-    ctx.lineWidth = Math.max(2, s*.016);
-    ctx.beginPath();
-    ctx.moveTo(mx, deckY + s*.01); ctx.lineTo(mx + mh*windLean*.4, top);
-    ctx.stroke();
-    // the pole above the highest canvas, and a long pennant off it
-    ctx.lineWidth = Math.max(1, s*.008);
-    ctx.beginPath();
-    ctx.moveTo(mx + mh*windLean*.4, top); ctx.lineTo(mx + mh*windLean*.5, top - mh*.09);
-    ctx.stroke();
-    ctx.strokeStyle = gal ? "#b3362a" : "#c03a2a";
-    ctx.lineWidth = Math.max(1.2, s*.009);
-    ctx.beginPath();
-    const pn = top - mh*.07;
-    ctx.moveTo(mx + mh*windLean*.5, pn);
-    ctx.quadraticCurveTo(mx - s*.07, pn + Math.sin(t*4+m)*s*.012,
-                         mx - s*.13, pn + s*.01 + Math.sin(t*4+m+1)*s*.015);
-    ctx.stroke();
-
-    const mizzen = m === 0;
-    if (mizzen){
-      // the lateen, a long yard slung fore-and-aft: in profile a tall
-      // triangle abaft the mast
-      ctx.strokeStyle = "#2e2110"; ctx.lineWidth = Math.max(1.2, s*.009);
-      ctx.beginPath();
-      ctx.moveTo(mx - L*.17, deckY - mh*.3);
-      ctx.lineTo(mx + L*.09, deckY - mh*1.02);
-      ctx.stroke();
-      ctx.fillStyle = "rgba(242,233,210,.96)";
-      ctx.beginPath();
-      ctx.moveTo(mx - L*.16, deckY - mh*.32);
-      ctx.lineTo(mx + L*.075, deckY - mh*.98);
-      ctx.quadraticCurveTo(mx + L*.02, deckY - mh*.4, mx - L*.02, deckY - mh*.18);
-      ctx.closePath(); ctx.fill();
-      continue;
-    }
-    // square sails up the mast: course near the deck, topsail above,
-    // a topgallant on the main. Spans in fractions of the mast height.
-    const SPANS = m === 1
-      ? [[.07, .44, 1], [.5, .78, .78], [.82, .98, .55]]
-      : [[.08, .48, 1], [.55, .92, .72]];
-    for (let k2 = 0; k2 < SPANS.length; k2++){
-      const [fB, fT, wf] = SPANS[k2];
-      const wTop = wf * (m === 1 ? L*.3 : L*.24) * .88;
-      const wBot = wf * (m === 1 ? L*.3 : L*.24) * 1.08;
-      const yT = deckY - mh * fT;
-      const yB = deckY - mh * fB;
-      const belly = s * .03 * (1 + k2*.2);
-      // the yard
-      ctx.strokeStyle = "#2e2110"; ctx.lineWidth = Math.max(1.2, s*.009);
-      ctx.beginPath();
-      ctx.moveTo(mx - wTop, yT); ctx.lineTo(mx + wTop, yT);
-      ctx.stroke();
-      // the cloth, drawing, lit from the left
-      const grad = ctx.createLinearGradient(mx - wBot, 0, mx + wBot, 0);
-      grad.addColorStop(0, "#fdf8ea");
-      grad.addColorStop(.55, "#efe5cb");
-      grad.addColorStop(1, "#d9cba8");
-      ctx.fillStyle = grad;
-      ctx.beginPath();
-      ctx.moveTo(mx - wTop, yT);
-      ctx.quadraticCurveTo(mx - wBot - belly, (yT+yB)/2, mx - wBot*.92, yB);
-      ctx.quadraticCurveTo(mx - belly*.4, yB + belly*.7, mx + wBot*.92, yB);
-      ctx.quadraticCurveTo(mx + wBot + belly*.2, (yT+yB)/2, mx + wTop, yT);
-      ctx.closePath(); ctx.fill();
-      ctx.strokeStyle = "rgba(120,100,70,.4)";
-      ctx.lineWidth = Math.max(.8, s*.004);
-      ctx.stroke();
-    }
-    // shrouds
-    ctx.strokeStyle = "rgba(40,28,14,.5)";
-    ctx.lineWidth = Math.max(.6, s*.003);
-    for (const dxr of [-.055, -.04, .04, .055]){
-      ctx.beginPath();
-      ctx.moveTo(mx + L*dxr*1.4, deckY);
-      ctx.lineTo(mx + mh*windLean*.35, top + mh*.12);
-      ctx.stroke();
-    }
-    // the flag at the masthead
-    const fw2 = s*.085, fh = s*.038;
-    const rip = Math.sin(t*6 + m*2 + ph) * fh*.25;
-    const fx2 = mx + mh*windLean*.4;
-    ctx.save();
-    ctx.translate(fx2, top);
-    if (gal){
-      ctx.fillStyle = "#f3ecda";
-      flagShape(fw2, fh, rip);
-      ctx.strokeStyle = "#b3362a"; ctx.lineWidth = Math.max(1, s*.007);
-      ctx.beginPath();
-      ctx.moveTo(-fw2*.92, -fh*.32 + rip*.4); ctx.lineTo(-fw2*.1, fh*.34);
-      ctx.moveTo(-fw2*.92, fh*.36 + rip*.4);  ctx.lineTo(-fw2*.1, -fh*.3);
-      ctx.stroke();
-    } else {
-      ctx.fillStyle = "#f6f2e8";
-      flagShape(fw2, fh, rip);
-      ctx.strokeStyle = "#c03a2a"; ctx.lineWidth = Math.max(1, s*.008);
-      ctx.beginPath();
-      ctx.moveTo(-fw2*.95, rip*.4); ctx.lineTo(-fw2*.05, rip*.1);
-      ctx.moveTo(-fw2*.55, -fh*.42 + rip*.3); ctx.lineTo(-fw2*.55, fh*.44 + rip*.3);
-      ctx.stroke();
-    }
-    ctx.restore();
-  }
-
-  // the sea working at her: a curl at the stem, a wake streak astern
-  ctx.fillStyle = "rgba(255,255,255,.75)";
-  ctx.beginPath();
-  const bw = Math.sin(t*2.2 + ph) * s*.006;
-  ctx.ellipse(L*.5, hullH*.3 + bw, s*.05, s*.016, -.3, 0, Math.PI*2);
-  ctx.fill();
-  ctx.globalAlpha = .4;
-  ctx.beginPath();
-  ctx.ellipse(-L*.55, hullH*.32, s*.09, s*.012, 0, 0, Math.PI*2);
-  ctx.fill();
+  // ---- the sea at the stem, and a wake streak astern
+  ctx.fillStyle = "rgba(255,255,255,.7)";
+  const bw = Math.sin(t*2.2 + ph) * s*.005;
+  ctx.beginPath(); ctx.ellipse(L*.5, keel*.7 + bw, s*.05, s*.014, -.3, 0, Math.PI*2); ctx.fill();
+  ctx.globalAlpha = .35;
+  ctx.beginPath(); ctx.ellipse(-L*.5, keel*.72, s*.09, s*.011, 0, 0, Math.PI*2); ctx.fill();
   ctx.globalAlpha = 1;
 
-  // bowsprit, with its own small sail
-  ctx.strokeStyle = "#2e2110"; ctx.lineWidth = Math.max(1.5, s*.011);
+  // ---- bowsprit and spritsail, and the jack staff
+  ctx.strokeStyle = "#2e2110"; ctx.lineWidth = Math.max(1.5, s*.01);
+  ctx.beginPath(); ctx.moveTo(L*.5, deck - free*.1); ctx.lineTo(L*.72, deck - s*.1); ctx.stroke();
+  ctx.fillStyle = "rgba(244,236,214,.9)";
   ctx.beginPath();
-  ctx.moveTo(L*.47, deckY - sheer*.1);
-  ctx.lineTo(L*.68, deckY - s*.1);
-  ctx.stroke();
-  ctx.fillStyle = "rgba(242,233,210,.9)";
-  ctx.beginPath();
-  ctx.moveTo(L*.52, deckY - sheer*.05);
-  ctx.quadraticCurveTo(L*.58, deckY + s*.03, L*.66, deckY - s*.075);
+  ctx.moveTo(L*.55, deck - free*.02);
+  ctx.quadraticCurveTo(L*.61, deck + s*.025, L*.69, deck - s*.07);
   ctx.closePath(); ctx.fill();
 
+  // ---- her colours, flying from the staffs
+  if (gal){
+    flyFlag(texBurgundy(), -L*.5, sStern - s*.16, s*.15, s*.1, t, ph);
+    flyFlag(texBurgundy(), L*.71, deck - s*.1, s*.08, s*.055, t, ph+2);
+  } else {
+    flyFlag(texRedEnsign(), -L*.47, sStern - s*.02, s*.16, s*.1, t, ph);
+    flyFlag(texUnionJack(), L*.73, deck - s*.1, s*.07, s*.05, t, ph+2);
+  }
+
   ctx.restore();
-}
-function flagShape(fw2, fh, rip){
-  ctx.beginPath();
-  ctx.moveTo(0, -fh*.5);
-  ctx.quadraticCurveTo(-fw2*.5, -fh*.5 + rip, -fw2, -fh*.42 + rip*.6);
-  ctx.lineTo(-fw2*.94, fh*.52 + rip*.6);
-  ctx.quadraticCurveTo(-fw2*.4, fh*.5 + rip, 0, fh*.5);
-  ctx.closePath(); ctx.fill();
 }
 
 // ------------------------------------------------- the gunnery between them
@@ -545,25 +543,27 @@ function battleStep(dt, t){
     const dir = eng ? 1 : -1;
     flashes.push({ x: gx, y: gy - H*.02, t: 0, dir });
     shoot();
-    for (let i = 0; i < 6; i++){
+    // a great bank of powder smoke rolling off her side
+    for (let i = 0; i < 11; i++){
       puffs.push({
-        x: gx + dir * (10 + Math.random()*26), y: gy - H*.015 - Math.random()*H*.05,
-        r: 6 + Math.random()*10, a: .95,
-        vx: dir * (26 + Math.random()*20), vy: -7 - Math.random()*9,
+        x: gx + dir * (8 + Math.random()*58), y: gy - H*.005 - Math.random()*H*.06,
+        r: 7 + Math.random()*13, a: .9,
+        vx: dir * (16 + Math.random()*26), vy: -4 - Math.random()*8,
       });
     }
-    // splashes short of the other hull
-    const n = 1 + (Math.random()*2|0);
+    if (puffs.length > 90) puffs.splice(0, puffs.length - 90);
+    // bigger splashes, a short fall of them around the other hull
+    const n = 3 + (Math.random()*3|0);
     for (let i = 0; i < n; i++){
-      splash2.push({ x: W*.475 + (Math.random()-.5)*W*.1, y: gy + H*.02 + Math.random()*H*.03,
-                     t: -(.3 + Math.random()*.4) });
+      splash2.push({ x: W*.46 + (Math.random()-.5)*W*.16, y: gy + H*.015 + Math.random()*H*.05,
+                     t: -(.2 + Math.random()*.6), big: Math.random() < .5 });
     }
   }
   for (const p of puffs){
     p.x += p.vx*dt; p.y += p.vy*dt;
     p.vx *= 1 - dt*.7; p.vy *= 1 - dt*.4;
     p.x += dt * 14;                              // the wind carries it all east
-    p.r += dt*26; p.a -= dt*.34;
+    p.r += dt*17; p.a -= dt*.34;
   }
   puffs = puffs.filter(p => p.a > 0);
   for (const f of flashes) f.t += dt;
@@ -582,14 +582,29 @@ function drawBattleFx(){
   for (const sp of splash2){
     if (sp.t < 0) continue;
     const f = sp.t;
-    ctx.globalAlpha = (1-f) * .85;
+    const m = sp.big ? 2.1 : 1.3;
+    ctx.globalAlpha = (1-f) * .9;
     ctx.fillStyle = "#ffffff";
+    // the column of water thrown up
     ctx.beginPath();
-    ctx.ellipse(sp.x, sp.y - f*H*.025*(1-f)*3, H*.004 + f*H*.004, H*.02*(1-f*.4), 0, 0, Math.PI*2);
+    ctx.ellipse(sp.x, sp.y - f*H*.05*(1-f)*3, (H*.006 + f*H*.006)*m,
+                H*.05*(1-f*.4)*m, 0, 0, Math.PI*2);
     ctx.fill();
+    // the spreading ring at its foot
     ctx.beginPath();
-    ctx.ellipse(sp.x, sp.y, H*.012 + f*H*.02, H*.005, 0, 0, Math.PI*2);
+    ctx.ellipse(sp.x, sp.y, (H*.016 + f*H*.03)*m, H*.007*m, 0, 0, Math.PI*2);
     ctx.fill();
+    // a scatter of droplets at the top of the plume
+    if (f < .5){
+      for (let k2 = 0; k2 < 4; k2++){
+        const a2 = k2*1.6 + sp.x;
+        ctx.beginPath();
+        ctx.arc(sp.x + Math.cos(a2)*H*.02*m*(f+.2),
+                sp.y - H*.05*(1-f)*2.4*m + Math.sin(a2)*H*.01,
+                H*.004*m, 0, Math.PI*2);
+        ctx.fill();
+      }
+    }
   }
   for (const p of puffs){
     ctx.globalAlpha = Math.max(0, p.a) * .9;
@@ -618,39 +633,10 @@ function frame(now){
 
   // the two of them, broadside to broadside off the cape:
   // the Englishman to windward on the left, the galleon to leeward
-  drawProfileShip("english", W*.33, hz + H*.138, Math.min(W*.21, H*.42), 1, t, 0);
-  drawProfileShip("galleon", W*.645, hz + H*.148, Math.min(W*.27, H*.54), -1, t, 2.2);
+  drawProfileShip("english", W*.25, hz + H*.14, Math.min(W*.2, H*.4), 1, t, 0);
+  drawProfileShip("galleon", W*.72, hz + H*.15, Math.min(W*.25, H*.5), -1, t, 2.2);
 
   drawBattleFx();
-
-  // a foreground rock, bottom-left, with pelicans and a splash of surf
-  ctx.fillStyle = "#6f5a3c";
-  ctx.beginPath();
-  ctx.moveTo(-10, H);
-  ctx.lineTo(W*.02, H*.84);
-  ctx.lineTo(W*.07, H*.88);
-  ctx.lineTo(W*.11, H*.82);
-  ctx.lineTo(W*.15, H);
-  ctx.closePath(); ctx.fill();
-  ctx.fillStyle = "#86log".replace("log","6e46");          // a lit facet
-  ctx.beginPath();
-  ctx.moveTo(W*.02, H*.84); ctx.lineTo(W*.07, H*.88);
-  ctx.lineTo(W*.055, H); ctx.lineTo(-10, H); ctx.closePath(); ctx.fill();
-  ctx.globalAlpha = .6; ctx.fillStyle = "#ffffff";          // surf at its foot
-  for (let i = 0; i < 5; i++){
-    const px = W*(.01 + i*.03), py = H*(.9 + .02*Math.sin(t*2+i));
-    ctx.beginPath(); ctx.ellipse(px, py, W*.02, H*.008, 0, 0, Math.PI*2); ctx.fill();
-  }
-  ctx.globalAlpha = 1;
-  // two brown pelicans perched on it
-  ctx.fillStyle = "#3f3326";
-  for (const [px, py] of [[W*.045, H*.82], [W*.085, H*.845]]){
-    ctx.beginPath(); ctx.ellipse(px, py, W*.011, H*.012, -.2, 0, Math.PI*2); ctx.fill();
-    ctx.beginPath(); ctx.arc(px - W*.009, py - H*.012, W*.004, 0, Math.PI*2); ctx.fill();
-    ctx.strokeStyle = "#3f3326"; ctx.lineWidth = Math.max(1, H*.003);
-    ctx.beginPath(); ctx.moveTo(px - W*.012, py - H*.012);
-    ctx.lineTo(px - W*.022, py - H*.006); ctx.stroke();   // the long bill
-  }
 
   // foreground swell, dark, for depth
   ctx.fillStyle = "rgba(14,70,110,.35)";
@@ -680,9 +666,20 @@ addEventListener("keydown", e => {
   startAudio();
 });
 addEventListener("pointerdown", startAudio);
+let actx = null, themeOn = false;
 function startAudio(){
   audioOn = true;
-  const a = document.getElementById("theme");
-  if (a && a.paused){ a.volume = .5; a.play().catch(()=>{}); }
+  if (themeOn) return;
+  themeOn = true;
+  try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e){ return; }
+  fetch("theme-britannia.m4a").then(r => r.arrayBuffer())
+    .then(b => actx.decodeAudioData(b))
+    .then(buf => {
+      const src2 = actx.createBufferSource();
+      src2.buffer = buf; src2.loop = true;          // gapless, sample-accurate
+      const g = actx.createGain(); g.gain.value = .5;
+      src2.connect(g); g.connect(actx.destination);
+      src2.start();
+    }).catch(()=>{});
 }
 </script>

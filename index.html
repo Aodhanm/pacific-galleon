@@ -577,7 +577,7 @@ function battleStep(dt, t){
     if (puffs.length > 90) puffs.splice(0, puffs.length - 90);
     // the SHOT: one ball per gun, each flying across and landing as one
     // splash, so there are exactly as many splashes as shots
-    const nShots = 4 + (Math.random()*3|0);
+    const nShots = 1 + (Math.random()*2|0);   // just a splash or two
     for (let i = 0; i < nShots; i++){
       const tx = toX + (Math.random()-.5)*W*.07;
       const ty = waterY + H*.01 + Math.random()*H*.03;

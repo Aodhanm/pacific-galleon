@@ -54,31 +54,31 @@ addEventListener("resize", resize); resize();
 // one cannon report per broadside: a small pool of the Victory single
 // shot, started muted until the first gesture so autoplay is happy
 const shotPool = Array.from({length: 3}, () => {
-  const a = new Audio("cannon-one.m4a"); a.volume = .55; return a;
+  const a = new Audio("cannon-one.m4a"); a.volume = .28; return a;
 });
 let shotI = 0, audioOn = false;
-const gullSnd = ["gull1.m4a","gull2.m4a"].map(f => { const a = new Audio(f); a.volume = .3; return a; });
-const splashSnd = Array.from({length: 2}, () => { const a = new Audio("splash.m4a"); a.volume = .4; return a; });
+const gullSnd = ["gull1.m4a","gull2.m4a"].map(f => { const a = new Audio(f); a.volume = .6; return a; });
+const splashSnd = Array.from({length: 6}, () => { const a = new Audio("splash.m4a"); a.volume = .35; return a; });
 let splashI = 0;
-function splashSound(){
+function splashSound(big){
   if (!audioOn) return;
   const a = splashSnd[splashI = (splashI+1) % splashSnd.length];
-  try { a.currentTime = 0; a.volume = .28 + Math.random()*.14; a.play().catch(()=>{}); } catch(e){}
+  try { a.currentTime = 0; a.volume = (big ? .3 : .2) + Math.random()*.1; a.play().catch(()=>{}); } catch(e){}
 }
-let gullWait = 6 + Math.random()*8;
+let gullWait = 3 + Math.random()*5;
 function gullCry(){
   if (!audioOn) return;
   const a = gullSnd[(Math.random()*gullSnd.length)|0];
-  try { a.currentTime = 0; a.volume = .18 + Math.random()*.16; a.play().catch(()=>{}); } catch(e){}
+  try { a.currentTime = 0; a.volume = .45 + Math.random()*.2; a.play().catch(()=>{}); } catch(e){}
 }
 function gullStep(dt){
   gullWait -= dt;
-  if (gullWait <= 0){ gullCry(); gullWait = 9 + Math.random()*14; }   // now and then, no more
+  if (gullWait <= 0){ gullCry(); gullWait = 6 + Math.random()*9; }   // now and then, no more
 }
 function shoot(){
   if (!audioOn) return;
   const a = shotPool[shotI = (shotI+1) % shotPool.length];
-  try { a.currentTime = 0; a.play().catch(()=>{}); } catch(e){}
+  try { a.currentTime = 0; a.volume = .26; a.play().catch(()=>{}); } catch(e){}
 }
 
 const HORIZON = () => H * .52;
@@ -575,10 +575,11 @@ function battleStep(dt, t){
     // bigger splashes, a short fall of them around the other hull
     const n = 3 + (Math.random()*3|0);
     for (let i = 0; i < n; i++){
+      const delay = .2 + Math.random()*.6, big = Math.random() < .5;
       splash2.push({ x: W*.46 + (Math.random()-.5)*W*.16, y: gy + H*.015 + Math.random()*H*.05,
-                     t: -(.2 + Math.random()*.6), big: Math.random() < .5 });
+                     t: -delay, big });
+      setTimeout(() => splashSound(big), (.42 + delay) * 1000);   // as each falls
     }
-    setTimeout(splashSound, 420);          // the shot falling into the sea
   }
   for (const p of puffs){
     p.x += p.vx*dt; p.y += p.vy*dt;

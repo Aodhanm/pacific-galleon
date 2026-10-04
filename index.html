@@ -58,6 +58,13 @@ const shotPool = Array.from({length: 3}, () => {
 });
 let shotI = 0, audioOn = false;
 const gullSnd = ["gull1.m4a","gull2.m4a"].map(f => { const a = new Audio(f); a.volume = .3; return a; });
+const splashSnd = Array.from({length: 2}, () => { const a = new Audio("splash.m4a"); a.volume = .4; return a; });
+let splashI = 0;
+function splashSound(){
+  if (!audioOn) return;
+  const a = splashSnd[splashI = (splashI+1) % splashSnd.length];
+  try { a.currentTime = 0; a.volume = .28 + Math.random()*.14; a.play().catch(()=>{}); } catch(e){}
+}
 let gullWait = 6 + Math.random()*8;
 function gullCry(){
   if (!audioOn) return;
@@ -571,6 +578,7 @@ function battleStep(dt, t){
       splash2.push({ x: W*.46 + (Math.random()-.5)*W*.16, y: gy + H*.015 + Math.random()*H*.05,
                      t: -(.2 + Math.random()*.6), big: Math.random() < .5 });
     }
+    setTimeout(splashSound, 420);          // the shot falling into the sea
   }
   for (const p of puffs){
     p.x += p.vx*dt; p.y += p.vy*dt;

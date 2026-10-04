@@ -1253,15 +1253,21 @@ function frame(now){
       // the odd bird crossing the view, and now and then a cry
       gullWait -= dt;
       if (gullWait <= 0){
-        gullWait = 16 + Math.random()*22;      // now and then, not too often
-        // enter at one side of the view and fly clean across it
+        gullWait = 18 + Math.random()*24;      // a flock now and then
         const halfW = (W/2)/T.k, halfH = (H/2)/T.k;
         const dir = Math.random() < .5 ? 1 : -1;
-        const sx = cam.x - dir*(halfW + 40);
-        const sy = cam.y + (Math.random()-.5)*halfH*1.2;
-        birds.push({ x: sx, y: sy, vx: dir*(70+Math.random()*40),
-          vy: (Math.random()-.5)*14, t: 0, cried: false, span: (halfW*2+80) });
-        if (Math.random() < .6) sfxGull();      // a cry as it comes over
+        const sx = cam.x - dir*(halfW + 50);
+        const sy = cam.y + (Math.random()-.5)*halfH;
+        const vx = dir*(60+Math.random()*30), vy = (Math.random()-.5)*12;
+        const n = 4 + (Math.random()*4|0);       // four to seven of them
+        for (let k = 0; k < n; k++){
+          birds.push({
+            x: sx - dir*k*(14+Math.random()*8),                 // strung out behind
+            y: sy + (k%2 ? 1 : -1)*Math.ceil(k/2)*(9+Math.random()*5),  // fanned in a V
+            vx: vx*(.95+Math.random()*.1), vy: vy + (Math.random()-.5)*4,
+            t: 0, cried: false });
+        }
+        sfxGull();                               // a cry from the flock
       }
       for (const b of birds){
         b.x += b.vx*dt; b.y += b.vy*dt; b.t += dt;

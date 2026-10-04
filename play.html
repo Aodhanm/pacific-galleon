@@ -1039,46 +1039,123 @@ function drawSailMark(){
 
 // a little side-elevation of YOUR ship, filling with gold as you loot,
 // the way doghole shows the deckload growing
+// a detailed side elevation of YOUR OWN ship, cut away so you watch her
+// hold fill with gold. Drawn FROM THE SHIP CLASS, so the Golden Hind is
+// small and lean and the Centurion long and high-charged.
 function drawTreasureInset(){
-  const bw = Math.min(260, W*.24), bx = W - bw - 30, by = H - 150;
-  const k = bw / 60;
+  const c = cls;
+  const panelW = Math.min(320, W*.3), px0 = W - panelW - 24, py0 = H - 164;
   ctx.save();
-  ctx.globalAlpha = .9;
-  // a backing panel
-  ctx.fillStyle = "rgba(10,28,36,.5)";
-  ctx.fillRect(bx - 14, by - 54, bw + 28, 96);
-  // the hull in profile
-  const hy = by;
-  ctx.fillStyle = "#3b2512";
+  // backing panel
+  ctx.globalAlpha = .92;
+  ctx.fillStyle = "rgba(10,28,36,.62)";
+  ctx.fillRect(px0 - 14, py0 - 70, panelW + 28, 150);
+  ctx.strokeStyle = "rgba(180,200,214,.2)"; ctx.lineWidth = 1;
+  ctx.strokeRect(px0 - 14, py0 - 70, panelW + 28, 150);
+
+  // her proportions, scaled to fit the panel (len 25..46 -> same width,
+  // but taller castles and deeper hull as the class grows)
+  const L = panelW, cx = px0 + L/2, wl = py0 + 8;     // waterline
+  const big = (c.len - 25) / 21;                       // 0 Golden Hind .. 1 Centurion
+  const hullH = 26 + big*10;                           // freeboard
+  const castle = c.castles;                            // .4 .. 1
+  const deck = wl - hullH;
+  const k = L / 2;
+
+  const col = { hull:c.wale, lo:"#241708", band:c.paint||"#6f4a22",
+                wale:c.accent, works:c.castle, gild:c.accent, deck:c.deck };
+
+  // the water she floats in
+  ctx.fillStyle = "rgba(60,160,180,.25)";
+  ctx.fillRect(px0 - 8, wl, L + 16, 64);
+
+  // ---- the hull: raked stem right, transom left, keel below the waterline
+  ctx.fillStyle = col.hull;
   ctx.beginPath();
-  ctx.moveTo(bx, hy);
-  ctx.quadraticCurveTo(bx - 6*k*.2, hy + 14, bx + 8*k*.2, hy + 16);
-  ctx.lineTo(bx + bw - 8*k*.2, hy + 16);
-  ctx.quadraticCurveTo(bx + bw + 4*k*.2, hy + 8, bx + bw, hy - 2);
-  ctx.lineTo(bx, hy - 2);
+  ctx.moveTo(px0, deck + 4);                            // transom top (stern, left)
+  ctx.quadraticCurveTo(px0 - 6, wl + 10, px0 + 14, wl + 16);  // sternpost + keel
+  ctx.lineTo(px0 + L - 18, wl + 16);
+  ctx.quadraticCurveTo(px0 + L + 8, wl + 2, px0 + L, deck + 2); // forefoot + stem
+  ctx.lineTo(px0 + L - 4, deck - 2);
+  ctx.lineTo(px0 + 2, deck + 1);
   ctx.closePath(); ctx.fill();
-  // three stub masts
-  ctx.strokeStyle = "#241a0c"; ctx.lineWidth = 2;
-  for (const f of [.2, .5, .8]){
-    ctx.beginPath(); ctx.moveTo(bx + bw*f, hy); ctx.lineTo(bx + bw*f, by - 46); ctx.stroke();
-  }
-  // the hold, filling with chests
-  const frac = ship.cargo / cls.cap;
-  const cols = 10, rows = 3;
-  const cw = (bw - 16) / cols, chh = 13;
+  // underbody shadow
+  ctx.save();
+  ctx.beginPath(); ctx.rect(px0 - 8, wl, L + 16, 40); ctx.clip();
+  ctx.fillStyle = col.lo;
+  ctx.beginPath();
+  ctx.moveTo(px0 + L, wl); ctx.quadraticCurveTo(px0 + L + 8, wl + 2, px0 + L - 18, wl + 16);
+  ctx.lineTo(px0 + 14, wl + 16); ctx.quadraticCurveTo(px0 - 6, wl + 10, px0, wl);
+  ctx.closePath(); ctx.fill();
+  ctx.restore();
+
+  // ---- the CUTAWAY hold, filling with gold chests (the point of it)
+  const holdX = px0 + 16, holdW = L - 34, holdTop = deck + 8, holdBot = wl + 10;
+  ctx.fillStyle = "rgba(20,14,8,.55)";                 // the dark hold
+  ctx.fillRect(holdX, holdTop, holdW, holdBot - holdTop);
+  const cols = Math.round(9 + big*4), rows = 3;
+  const cw = holdW / cols, rh = (holdBot - holdTop) / rows;
+  const frac = c.cap ? ship.cargo / c.cap : 0;
   let n = Math.round(frac * cols * rows);
-  for (let r2 = 0; r2 < rows; r2++){
-    for (let c2 = 0; c2 < cols; c2++){
-      if (n <= 0) break;
+  for (let r2 = 0; r2 < rows && n > 0; r2++){
+    for (let c2 = 0; c2 < cols && n > 0; c2++){
+      const gx = holdX + c2*cw + 1, gy = holdBot - (r2+1)*rh + 1;
       ctx.fillStyle = (c2 + r2) % 2 ? "#c8781f" : "#f2a63c";
-      ctx.fillRect(bx + 8 + c2*cw, hy - 4 - (r2+1)*chh*.9, cw - 2, chh*.7);
+      ctx.fillRect(gx, gy, cw - 2, rh - 2);
+      ctx.fillStyle = "rgba(255,235,170,.6)";          // a glint of lid
+      ctx.fillRect(gx, gy, cw - 2, 2);
       n--;
     }
   }
+
+  // ---- wales, gunports, and the painted strake over the hold
+  if (c.paint){ ctx.strokeStyle = c.paint; ctx.lineWidth = 5;
+    ctx.beginPath(); ctx.moveTo(px0 + 2, deck + 10); ctx.lineTo(px0 + L - 4, deck + 8); ctx.stroke(); }
+  ctx.strokeStyle = col.wale; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(px0 + 2, deck + 9); ctx.lineTo(px0 + L - 4, deck + 7); ctx.stroke();
+  const decks = c.decks || 1, nP = Math.round(5 + big*5);
+  for (let d = 0; d < decks; d++){
+    for (let i = 0; i < nP; i++){
+      const gx = px0 + 18 + i*(L - 40)/(nP-1);
+      ctx.fillStyle = "#15100a"; ctx.fillRect(gx - 3, deck + 12 + d*9, 6, 6);
+      ctx.fillStyle = "#8a1410"; ctx.fillRect(gx - 3, deck + 8 + d*9, 6, 3);
+    }
+  }
+
+  // ---- upperworks: quarterdeck aft (left) and forecastle, scaled by castle
+  ctx.fillStyle = col.works;
+  const qh = 10 + castle*26;
+  ctx.fillRect(px0, deck - qh, L*0.26, qh + 2);                       // quarterdeck/sterncastle
+  ctx.fillRect(px0 + L*0.72, deck - (6 + castle*10), L*0.26, 6 + castle*10); // forecastle
+  if (castle >= 1){                                                   // galleon-style gallery
+    ctx.fillStyle = col.gild;
+    for (let i=0;i<3;i++) ctx.fillRect(px0, deck - qh + i*qh/3, L*0.2, 2);
+  } else {                                                            // quarter windows
+    ctx.fillStyle = "#cdbb90";
+    for (let i=0;i<3;i++) ctx.fillRect(px0 + 4 + i*10, deck - qh + 5, 7, 7);
+  }
+
+  // ---- three masts with yards, taller amidships
+  ctx.strokeStyle = "#241a0c"; ctx.lineWidth = 2.5;
+  const mast = [0.16, 0.5, 0.82], mh = [0.74, 1, 0.68];
+  for (let m = 0; m < 3; m++){
+    const mx = px0 + L*mast[m], top = deck - (58 + big*22)*mh[m];
+    ctx.beginPath(); ctx.moveTo(mx, deck - (m===0?qh:0)); ctx.lineTo(mx, top); ctx.stroke();
+    ctx.lineWidth = 1.6;                                              // a couple of yards
+    for (const yf of [0.4, 0.68]){
+      const yy = deck - (58 + big*22)*mh[m]*yf;
+      ctx.beginPath(); ctx.moveTo(mx - 11*mh[m], yy); ctx.lineTo(mx + 11*mh[m], yy); ctx.stroke();
+    }
+    ctx.lineWidth = 2.5;
+  }
+  // bowsprit
+  ctx.beginPath(); ctx.moveTo(px0 + L - 2, deck + 2); ctx.lineTo(px0 + L + 10, deck - 10); ctx.stroke();
+
+  // the readout
   ctx.fillStyle = "#e7eef4";
   ctx.font = "13px " + getComputedStyle(document.body).fontFamily;
   ctx.textAlign = "right";
-  ctx.fillText(`${Math.floor(ship.cargo)} / ${cls.cap} chests aboard`, bx + bw, by - 44);
+  ctx.fillText(`${Math.floor(ship.cargo)} / ${c.cap} chests  ·  ${c.name}`, px0 + L, py0 - 54);
   ctx.restore();
 }
 function drawChestPops(){

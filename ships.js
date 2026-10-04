@@ -37,40 +37,48 @@ export const degOf = r => ((r * 180 / Math.PI) % 360 + 360) % 360;
 // for Spain, which is what Spanish ships wore at sea in all four eras.
 export const CLASSES = {
   goldenhind: {
+    // a little Tudor galleon: short, beamy, a tall carrack-like
+    // sterncastle, green-and-white painted topsides
     name: "Golden Hind", captain: "Drake", year: 1579,
-    len: 25, beam: 6.8, masts: 3, castles: .5,
+    len: 24, beam: 8.2, masts: 3, castles: .78, decks: 1,
     sail: 1.55, kFwd: .057, kLat: 1.05, rud: .118, yawDamp: .95,
     mass0: 1.0, loadK: 1.05, draft0: 6, cap: 30,
     polar: { irons: 55, beam: .82, bestA: 135, best: 1, run: .86 },
-    wale: "#452f18", deck: "#c29d66", castle: "#8a6434", castleHi: "#9f7840",
-    accent: "#d9a441", flag: "english",
+    wale: "#3c6b3e", deck: "#caa972", castle: "#2f6b45", castleHi: "#3f8056",
+    paint: "#e8e2d0", accent: "#d9a441", flag: "english",
   },
   desire: {
+    // an Elizabethan race-built ship: leaner than the Hind, a medium
+    // castle, dark red and gold
     name: "Desire", captain: "Cavendish", year: 1587,
-    len: 26, beam: 7.2, masts: 3, castles: .6,
+    len: 28, beam: 7.6, masts: 3, castles: .55, decks: 1,
     sail: 1.52, kFwd: .058, kLat: 1.05, rud: .105, yawDamp: .95,
     mass0: 1.1, loadK: 1.05, draft0: 6.5, cap: 36,
     polar: { irons: 56, beam: .8, bestA: 136, best: 1, run: .87 },
-    wale: "#3f2c18", deck: "#bb9763", castle: "#80602f", castleHi: "#94713a",
-    accent: "#c69a3e", flag: "english",
+    wale: "#4a2420", deck: "#b89158", castle: "#6e2a28", castleHi: "#8a3733",
+    paint: "#d9a441", accent: "#d9a441", flag: "english",
   },
   duke: {
+    // a Queen Anne frigate-privateer: long, lean, low and flush, a black
+    // wale on a buff hull
     name: "Duke", captain: "Woodes Rogers", year: 1709,
-    len: 32, beam: 8.8, masts: 3, castles: .45,
+    len: 34, beam: 8.4, masts: 3, castles: .34, decks: 1,
     sail: 1.62, kFwd: .066, kLat: 1.1, rud: .085, yawDamp: 1.0,
     mass0: 1.6, loadK: .9, draft0: 8, cap: 50,
     polar: { irons: 58, beam: .78, bestA: 138, best: 1, run: .88 },
-    wale: "#38281a", deck: "#b4905c", castle: "#776033", castleHi: "#8a7140",
-    accent: "#b98f3a", flag: "english",
+    wale: "#201811", deck: "#c6a573", castle: "#5a4428", castleHi: "#6e5533",
+    paint: "#2a2018", accent: "#b98f3a", flag: "english",
   },
   centurion: {
+    // a 60-gun fourth-rate man-of-war: long, broad and high-sided, TWO
+    // gun decks, the blue-and-yellow of the Georgian navy
     name: "Centurion", captain: "Anson", year: 1743,
-    len: 46, beam: 12.6, masts: 3, castles: .4,
+    len: 48, beam: 12.6, masts: 3, castles: .5, decks: 2,
     sail: 1.78, kFwd: .079, kLat: 1.2, rud: .06, yawDamp: 1.15,
     mass0: 2.4, loadK: .75, draft0: 10.5, cap: 70,
     polar: { irons: 60, beam: .76, bestA: 140, best: 1, run: .9 },
-    wale: "#33271c", deck: "#ad8c5e", castle: "#6f5c36", castleHi: "#827044",
-    accent: "#c9a23f", flag: "english",
+    wale: "#1b2740", deck: "#a98f63", castle: "#243a63", castleHi: "#31508a",
+    paint: "#e3c24a", accent: "#e3c24a", flag: "english",
   },
   // the prize. The variants (unarmed and fat, the normal prize, the one
   // you do not touch) come later as overrides on this base; see the
@@ -277,9 +285,11 @@ export function drawShip(ctx, T, s, t, C) {
     ctx.globalAlpha = 1;
   }
 
-  // ---- the hull: wale, bulwark, then the planked deck
+  // ---- the hull: wale, a painted sheer strake (her own colours), the
+  //      bulwark, then the planked deck
   hullPath(0);  ctx.fillStyle = c.wale;  ctx.fill();
-  hullPath(.55); ctx.fillStyle = full ? "#6b4526" : "#5d4224"; ctx.fill();
+  if (c.paint){ hullPath(.45); ctx.fillStyle = c.paint; ctx.fill(); }
+  hullPath(.9); ctx.fillStyle = full ? "#6b4526" : "#5d4224"; ctx.fill();
   hullPath(1.1); ctx.fillStyle = c.deck; ctx.fill();
 
   // deck planks, running fore and aft, clipped to the deck
@@ -300,13 +310,18 @@ export function drawShip(ctx, T, s, t, C) {
   ctx.strokeRect(S(-B * .17), S(-L * .07), S(B * .34), S(L * .13));
   ctx.restore();
 
-  // guns run out along the rails, little black muzzles
+  // guns run out along the rails, little black muzzles. A two-decker
+  // (the Centurion) shows a second, inner row.
   const nG = Math.max(2, Math.floor(L / 8));
+  const decks = c.decks || 1;
   ctx.fillStyle = "#1c1612";
   for (let g = 0; g < nG; g++) {
     const gy = -L * .26 + (g + .5) * (L * .5 / nG);
     for (const side of [-1, 1]) {
-      ctx.fillRect(S(side * (B/2 - .9) - .35), S(gy), Math.max(1, S(1.3)) * (side<0?-1:1), Math.max(1, S(.65)));
+      for (let d = 0; d < decks; d++) {
+        const off = B/2 - .9 - d * 1.6;
+        ctx.fillRect(S(side * off - .35), S(gy), Math.max(1, S(1.3)) * (side<0?-1:1), Math.max(1, S(.65)));
+      }
     }
   }
 

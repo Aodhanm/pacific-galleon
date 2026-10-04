@@ -57,6 +57,8 @@ const shotPool = Array.from({length: 3}, () => {
   const a = new Audio("cannon-one.m4a"); a.volume = .28; return a;
 });
 let shotI = 0, audioOn = false;
+let muted = localStorage.getItem("pg_muted") === "1";
+let actx = null, themeOn = false, masterGain = null;
 const gullSnd = ["gull1.m4a","gull2.m4a"].map(f => { const a = new Audio(f); a.volume = .6; return a; });
 const splashSnd = Array.from({length: 6}, () => { const a = new Audio("splash.m4a"); a.volume = .35; return a; });
 let splashI = 0;
@@ -752,6 +754,7 @@ function frame(now){
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
+applyMute();   // carry a mute set on another screen
 
 // ------------------------------------------------------------- input
 function play(ship){
@@ -765,23 +768,32 @@ addEventListener("keydown", e => {
   if (k === "3") play("duke");
   if (k === "4") play("centurion");
   if (k === "w") whale = { t: 0 };
+  if (k === "m" || k === "M"){
+    muted = !muted; localStorage.setItem("pg_muted", muted ? "1" : "0"); applyMute();
+  }
   startAudio();
 });
 addEventListener("pointerdown", startAudio);
-let actx = null, themeOn = false;
 function startAudio(){
   audioOn = true;
   if (themeOn) return;
   themeOn = true;
   try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e){ return; }
+  masterGain = actx.createGain();
+  masterGain.gain.value = muted ? 0 : 1;
+  masterGain.connect(actx.destination);
   fetch("theme-britannia.m4a").then(r => r.arrayBuffer())
     .then(b => actx.decodeAudioData(b))
     .then(buf => {
       const src2 = actx.createBufferSource();
       src2.buffer = buf; src2.loop = true;          // gapless, sample-accurate
       const g = actx.createGain(); g.gain.value = .5;
-      src2.connect(g); g.connect(actx.destination);
+      src2.connect(g); g.connect(masterGain);
       src2.start();
     }).catch(()=>{});
+}
+function applyMute(){
+  if (masterGain) masterGain.gain.value = muted ? 0 : 1;
+  for (const a of [...shotPool, ...gullSnd, ...splashSnd]) a.muted = muted;
 }
 </script>

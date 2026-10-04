@@ -854,12 +854,18 @@ window.__sfx = { broadside: n => sfxBroadside(n||5), splash: sfxSplash,
 // The Marcha Real, slow and in the old style, rises when the galleon is
 // sighted and holds through the action; the Grenadiers sound when you
 // take her. M mutes. Both are the game's own arrangements (music/).
-let muted = false;
+let muted = localStorage.getItem("pg_muted") === "1";
 function music(id, on, vol){
   const a = document.getElementById(id);
   if (!a) return;
   if (on){ a.volume = vol; a.muted = muted; a.play().catch(()=>{}); }
   else { a.pause(); a.currentTime = 0; }
+}
+function applyMute(){
+  for (const id of ["britannia", "grenadiers"]){
+    const a = document.getElementById(id); if (a) a.muted = muted;
+  }
+  if (sfxGain && A) sfxGain.gain.setTargetAtTime(muted ? 0 : 1, A.currentTime, .1);
 }
 
 // ------------------------------------------------------------- cards
@@ -923,7 +929,7 @@ addEventListener("keydown", e => {
   const k = e.key.toLowerCase();
   keys[k] = true;
   if (k === "enter"){
-    if (phase === "brief"){ hideCard(); phase = "wait"; audioInit(); music("britannia", true, .45); }
+    if (phase === "brief"){ hideCard(); phase = "wait"; audioInit(); applyMute(); music("britannia", true, .45); }
     else if (phase === "over"){
       music("grenadiers", false);
       reset(); hideCard(); phase = "wait"; music("britannia", true, .45);
@@ -931,10 +937,8 @@ addEventListener("keydown", e => {
   }
   if (k === "m"){
     muted = !muted;
-    for (const id of ["marcha", "grenadiers"]){
-      const a = document.getElementById(id); if (a) a.muted = muted;
-    }
-    if (sfxGain) sfxGain.gain.setTargetAtTime(muted ? 0 : 1, A.currentTime, .1);
+    localStorage.setItem("pg_muted", muted ? "1" : "0");
+    applyMute();
   }
   if (k === " "){
     e.preventDefault();

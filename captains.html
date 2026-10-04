@@ -397,102 +397,226 @@ function shade(hex, d){
 //          aquila (a centurion's standard), rose = a Tudor rose (for the
 //          Elizabethan Desire).
 function drawEmblem(ctx, cx, cy, r, key){
-  const g = "#e7c24a", gD = "#b9952f";
+  const g = "#eccb55", gHi = "#f7e6a0", gD = "#a9842a", gDk = "#7d5f1c";
+  const outline = (lw) => { ctx.strokeStyle = gDk; ctx.lineWidth = r*lw; ctx.lineJoin="round"; ctx.stroke(); };
   ctx.save(); ctx.translate(cx, cy);
+
   if (key === "hind"){
-    ctx.fillStyle = g;
-    // body
-    ctx.beginPath(); ctx.ellipse(0, r*.1, r*.52, r*.3, -.08, 0, Math.PI*2); ctx.fill();
-    // neck + head, reaching forward and up (a leaping doe)
+    // a heraldic hind at speed: slender doe, ducal collar, hooves, eye
+    ctx.lineCap = "round"; ctx.lineJoin = "round";
+    // far legs first (darker), then near legs
+    ctx.strokeStyle = gD; ctx.lineWidth = r*.09;
+    ctx.beginPath(); ctx.moveTo(-r*.34,r*.18); ctx.lineTo(-r*.58,r*.5); ctx.lineTo(-r*.5,r*.66);  // far hind
+    ctx.moveTo(r*.26,r*.16); ctx.lineTo(r*.48,r*.5); ctx.lineTo(r*.4,r*.66);                       // far fore
+    ctx.stroke();
+    // body: chest, barrel, haunch
+    const grd = ctx.createLinearGradient(0,-r*.2,0,r*.4);
+    grd.addColorStop(0,gHi); grd.addColorStop(.5,g); grd.addColorStop(1,gD);
+    ctx.fillStyle = grd;
     ctx.beginPath();
-    ctx.moveTo(r*.35, r*.0);
-    ctx.quadraticCurveTo(r*.7, -r*.3, r*.78, -r*.55);
-    ctx.lineTo(r*.92, -r*.5);
-    ctx.quadraticCurveTo(r*.95, -r*.62, r*.84, -r*.68);  // muzzle
-    ctx.quadraticCurveTo(r*.66, -r*.5, r*.5, -r*.18);
-    ctx.closePath(); ctx.fill();
-    // ears
-    ctx.beginPath(); ctx.moveTo(r*.8,-r*.58); ctx.lineTo(r*.9,-r*.78); ctx.lineTo(r*.72,-r*.64); ctx.closePath(); ctx.fill();
-    // legs, galloping
-    ctx.strokeStyle = g; ctx.lineWidth = r*.1; ctx.lineCap="round";
-    ctx.beginPath(); ctx.moveTo(-r*.3, r*.3); ctx.lineTo(-r*.5, r*.66);
-    ctx.moveTo(-r*.12, r*.34); ctx.lineTo(-r*.02, r*.7);
-    ctx.moveTo(r*.18, r*.32); ctx.lineTo(r*.34, r*.66);
-    ctx.moveTo(r*.3, r*.26); ctx.lineTo(r*.5, r*.58); ctx.stroke();
-    // tail
-    ctx.beginPath(); ctx.moveTo(-r*.5, -r*.02); ctx.lineTo(-r*.66,-r*.2); ctx.stroke();
-  } else if (key === "coronet"){
-    // a ducal coronet: a jewelled gold circlet with strawberry leaves
-    ctx.fillStyle = g;
-    ctx.beginPath(); ctx.rect(-r*.7, r*.12, r*1.4, r*.3); ctx.fill();   // the band
+    ctx.moveTo(-r*.6, r*.0);                              // rump
+    ctx.quadraticCurveTo(-r*.66,-r*.26, -r*.3,-r*.26);    // back
+    ctx.quadraticCurveTo(r*.08,-r*.28, r*.3,-r*.14);      // withers
+    ctx.quadraticCurveTo(r*.5,-r*.06, r*.46,r*.14);       // chest
+    ctx.quadraticCurveTo(r*.2,r*.3, -r*.1,r*.28);         // belly
+    ctx.quadraticCurveTo(-r*.44,r*.26, -r*.6,r*.0);       // flank to rump
+    ctx.closePath(); ctx.fill(); outline(.05);
+    // neck + head reaching up and forward
+    ctx.fillStyle = grd;
+    ctx.beginPath();
+    ctx.moveTo(r*.28,-r*.12);
+    ctx.quadraticCurveTo(r*.62,-r*.34, r*.7,-r*.62);      // neck front
+    ctx.quadraticCurveTo(r*.74,-r*.78, r*.9,-r*.74);      // top of head
+    ctx.quadraticCurveTo(r*1.02,-r*.72, r*.98,-r*.6);     // muzzle top
+    ctx.lineTo(r*.82,-r*.56);                             // mouth
+    ctx.quadraticCurveTo(r*.72,-r*.5, r*.56,-r*.28);      // throat
+    ctx.quadraticCurveTo(r*.42,-r*.12, r*.28,-r*.12);
+    ctx.closePath(); ctx.fill(); outline(.045);
+    // ear and eye
     ctx.fillStyle = gD;
-    for (let i=-2;i<=2;i++){ ctx.beginPath(); ctx.arc(i*r*.3, r*.27, r*.06, 0, Math.PI*2); ctx.fill(); } // jewels
-    ctx.fillStyle = g;
-    // five strawberry leaves rising from the band
+    ctx.beginPath(); ctx.moveTo(r*.84,-r*.72); ctx.lineTo(r*.78,-r*.92); ctx.lineTo(r*.7,-r*.7); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "#3b2a0e";
+    ctx.beginPath(); ctx.arc(r*.86,-r*.66,r*.045,0,Math.PI*2); ctx.fill();
+    // near legs (bright), leaping
+    ctx.strokeStyle = g; ctx.lineWidth = r*.1; ctx.lineCap="round";
+    ctx.beginPath(); ctx.moveTo(-r*.28,r*.2); ctx.lineTo(-r*.46,r*.56); ctx.lineTo(-r*.38,r*.72);  // near hind
+    ctx.moveTo(r*.3,r*.16); ctx.lineTo(r*.56,r*.52); ctx.lineTo(r*.48,r*.72);                        // near fore
+    ctx.stroke();
+    ctx.strokeStyle = gDk; ctx.lineWidth = r*.05;         // hooves
+    for (const [x,y] of [[-r*.38,r*.72],[r*.48,r*.72],[-r*.5,r*.66],[r*.4,r*.66]]){
+      ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x,y+r*.04); ctx.stroke(); }
+    // the ducal collar and chain round the neck
+    ctx.strokeStyle = gDk; ctx.lineWidth = r*.07;
+    ctx.beginPath(); ctx.moveTo(r*.44,-r*.2); ctx.quadraticCurveTo(r*.56,-r*.3, r*.6,-r*.46); ctx.stroke();
+    // a little tail
+    ctx.fillStyle = gHi;
+    ctx.beginPath(); ctx.moveTo(-r*.6,-r*.02); ctx.quadraticCurveTo(-r*.74,-r*.12,-r*.7,-r*.26);
+    ctx.quadraticCurveTo(-r*.6,-r*.14,-r*.56,-r*.04); ctx.fill();
+
+  } else if (key === "coronet"){
+    // a ducal coronet on a crimson cap, with strawberry leaves, pearls
+    // and alternating gems
+    // the crimson velvet cap behind the circlet
+    ctx.fillStyle = "#7c1f22";
+    ctx.beginPath(); ctx.ellipse(0,-r*.16,r*.6,r*.5,0,Math.PI,0); ctx.fill();
+    ctx.fillStyle = "rgba(255,180,160,.18)";
+    ctx.beginPath(); ctx.ellipse(-r*.18,-r*.3,r*.2,r*.28,0,0,Math.PI*2); ctx.fill();
+    // five chased strawberry leaves with a central vein
     for (let i=-2;i<=2;i++){
-      const x = i*r*.33, h = (i===0?.9:Math.abs(i)===1?.74:.58);
+      const x=i*r*.34, h=(i===0?1.0:Math.abs(i)===1?.82:.62);
+      const lg = ctx.createLinearGradient(x,-r*h,x,r*.1);
+      lg.addColorStop(0,gHi); lg.addColorStop(1,gD);
+      ctx.fillStyle = lg;
       ctx.beginPath();
       ctx.moveTo(x, r*.12);
-      ctx.quadraticCurveTo(x-r*.16, -r*h*.4, x-r*.05, -r*h*.7);
-      ctx.quadraticCurveTo(x-r*.12,-r*h*.82, x, -r*h);
-      ctx.quadraticCurveTo(x+r*.12,-r*h*.82, x+r*.05, -r*h*.7);
-      ctx.quadraticCurveTo(x+r*.16, -r*h*.4, x, r*.12);
-      ctx.fill();
+      ctx.quadraticCurveTo(x-r*.2,-r*h*.3, x-r*.14,-r*h*.6);
+      ctx.quadraticCurveTo(x-r*.2,-r*h*.72, x-r*.07,-r*h*.78);
+      ctx.quadraticCurveTo(x-r*.11,-r*h*.9, x,-r*h);        // top lobe
+      ctx.quadraticCurveTo(x+r*.11,-r*h*.9, x+r*.07,-r*h*.78);
+      ctx.quadraticCurveTo(x+r*.2,-r*h*.72, x+r*.14,-r*h*.6);
+      ctx.quadraticCurveTo(x+r*.2,-r*h*.3, x, r*.12);
+      ctx.fill(); outline(.03);
+      ctx.strokeStyle = gDk; ctx.lineWidth=r*.025;         // central vein
+      ctx.beginPath(); ctx.moveTo(x,-r*h*.1); ctx.lineTo(x,-r*h*.78); ctx.stroke();
     }
+    // the jewelled circlet band
+    const bg = ctx.createLinearGradient(0,r*.08,0,r*.44);
+    bg.addColorStop(0,gHi); bg.addColorStop(.5,g); bg.addColorStop(1,gD);
+    ctx.fillStyle = bg;
+    ctx.beginPath(); ctx.moveTo(-r*.74,r*.1); ctx.lineTo(r*.74,r*.1);
+    ctx.quadraticCurveTo(r*.8,r*.26,r*.7,r*.42); ctx.lineTo(-r*.7,r*.42);
+    ctx.quadraticCurveTo(-r*.8,r*.26,-r*.74,r*.1); ctx.closePath(); ctx.fill(); outline(.03);
+    // pearls along the top and bottom rims
+    ctx.fillStyle = gHi;
+    for (let i=-3;i<=3;i++){ ctx.beginPath(); ctx.arc(i*r*.2,r*.13,r*.03,0,Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(i*r*.2+r*.1,r*.4,r*.025,0,Math.PI*2); ctx.fill(); }
+    // alternating ruby / sapphire gems
+    for (let i=-2;i<=2;i++){
+      ctx.fillStyle = i%2 ? "#2b5bd0" : "#c0352e";
+      ctx.beginPath(); ctx.arc(i*r*.26,r*.27,r*.07,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle = "rgba(255,255,255,.6)";
+      ctx.beginPath(); ctx.arc(i*r*.26-r*.02,r*.24,r*.02,0,Math.PI*2); ctx.fill();
+    }
+
   } else if (key === "eagle"){
-    // the Roman aquila: wings spread, head turned
-    ctx.fillStyle = g;
-    for (const sx of [-1,1]){                           // the two wings
-      ctx.beginPath();
-      ctx.moveTo(0, -r*.1);
-      ctx.quadraticCurveTo(sx*r*.5, -r*.5, sx*r*.95, -r*.3);
-      ctx.quadraticCurveTo(sx*r*.6, -r*.12, sx*r*.9, r*.05);
-      ctx.quadraticCurveTo(sx*r*.55, r*.1, sx*r*.8, r*.3);
-      ctx.quadraticCurveTo(sx*r*.4, r*.14, 0, r*.15);
+    // the Roman aquila, displayed, head turned, gripping a thunderbolt,
+    // layered wing feathers
+    const grd = ctx.createLinearGradient(0,-r*.5,0,r*.6);
+    grd.addColorStop(0,gHi); grd.addColorStop(.6,g); grd.addColorStop(1,gD);
+    // wings: three tiers of feathers each side
+    for (const sx of [-1,1]){
+      ctx.fillStyle = grd;
+      for (let tier=0; tier<3; tier++){
+        const yb = -r*.34 + tier*r*.22, sp = r*(.98 - tier*.14);
+        ctx.beginPath();
+        ctx.moveTo(sx*r*.12, yb);
+        for (let f=0; f<4; f++){
+          const t0 = f/4, t1 = (f+1)/4;
+          const x0 = sx*(r*.12 + sp*t0), x1 = sx*(r*.12 + sp*t1);
+          ctx.lineTo(x0, yb + r*.02);
+          ctx.quadraticCurveTo(sx*(r*.12+sp*(t0+.08)), yb+r*.16, x1, yb+r*.1);
+        }
+        ctx.lineTo(sx*r*.12, yb+r*.14);
+        ctx.closePath(); ctx.fill(); outline(.02);
+      }
+    }
+    // body and tail
+    ctx.fillStyle = grd;
+    ctx.beginPath(); ctx.ellipse(0,r*.08,r*.16,r*.36,0,0,Math.PI*2); ctx.fill(); outline(.03);
+    ctx.beginPath();                                     // tail feathers
+    ctx.moveTo(-r*.16,r*.34);
+    for (let f=-2;f<=2;f++){ ctx.lineTo(f*r*.07, r*.66 + Math.abs(f)*r*.02); ctx.lineTo(f*r*.07+r*.035, r*.4); }
+    ctx.closePath(); ctx.fill(); outline(.02);
+    // head turned to its right, crest, eye and beak
+    ctx.fillStyle = grd;
+    ctx.beginPath(); ctx.arc(r*.04,-r*.46,r*.15,0,Math.PI*2); ctx.fill(); outline(.03);
+    ctx.fillStyle = gD;
+    ctx.beginPath(); ctx.moveTo(r*.17,-r*.5); ctx.lineTo(r*.4,-r*.46); ctx.lineTo(r*.17,-r*.4); ctx.closePath(); ctx.fill(); // beak
+    ctx.fillStyle = "#3b2a0e";
+    ctx.beginPath(); ctx.arc(r*.1,-r*.49,r*.035,0,Math.PI*2); ctx.fill();
+    // talons gripping a thunderbolt (bars with flames both ends)
+    ctx.strokeStyle = gDk; ctx.lineWidth = r*.05;
+    ctx.beginPath(); ctx.moveTo(-r*.3,r*.5); ctx.lineTo(r*.3,r*.5); ctx.stroke();
+    ctx.fillStyle = gHi;
+    for (const sx of [-1,1]){
+      ctx.beginPath(); ctx.moveTo(sx*r*.3,r*.5);
+      ctx.lineTo(sx*r*.46,r*.44); ctx.lineTo(sx*r*.38,r*.5); ctx.lineTo(sx*r*.46,r*.56);
       ctx.closePath(); ctx.fill();
     }
-    // body + tail
-    ctx.beginPath(); ctx.ellipse(0, r*.05, r*.17, r*.34, 0, 0, Math.PI*2); ctx.fill();
-    ctx.beginPath(); ctx.moveTo(-r*.12, r*.3); ctx.lineTo(0, r*.6); ctx.lineTo(r*.12, r*.3); ctx.closePath(); ctx.fill();
-    // head turned to its right, with a beak
-    ctx.beginPath(); ctx.arc(r*.06, -r*.34, r*.14, 0, Math.PI*2); ctx.fill();
-    ctx.beginPath(); ctx.moveTo(r*.18,-r*.36); ctx.lineTo(r*.34,-r*.32); ctx.lineTo(r*.18,-r*.26); ctx.closePath(); ctx.fill();
+
   } else if (key === "rose"){
-    // a Tudor rose: five red outer petals, five white inner, gold seeds
-    ctx.fillStyle = "#b6362c";
-    for (let i=0;i<5;i++){
-      const a = -Math.PI/2 + i/5*Math.PI*2;
-      ctx.beginPath();
-      ctx.ellipse(Math.cos(a)*r*.52, Math.sin(a)*r*.52, r*.34, r*.42, a+Math.PI/2, 0, Math.PI*2);
-      ctx.fill();
-    }
-    ctx.fillStyle = "#f3ede0";
+    // a Tudor double rose: green barbs, red outer petals with notch and
+    // veins, white inner petals, a seeded gold centre
+    ctx.fillStyle = "#3f6b34";                            // the barbs/sepals
     for (let i=0;i<5;i++){
       const a = -Math.PI/2 + Math.PI/5 + i/5*Math.PI*2;
       ctx.beginPath();
-      ctx.ellipse(Math.cos(a)*r*.3, Math.sin(a)*r*.3, r*.22, r*.28, a+Math.PI/2, 0, Math.PI*2);
-      ctx.fill();
+      ctx.moveTo(0,0);
+      ctx.lineTo(Math.cos(a-.18)*r*.9, Math.sin(a-.18)*r*.9);
+      ctx.lineTo(Math.cos(a)*r*.6, Math.sin(a)*r*.6);
+      ctx.lineTo(Math.cos(a+.18)*r*.9, Math.sin(a+.18)*r*.9);
+      ctx.closePath(); ctx.fill();
     }
-    ctx.fillStyle = g;
-    ctx.beginPath(); ctx.arc(0,0,r*.2,0,Math.PI*2); ctx.fill();
-    ctx.fillStyle = gD;
-    for (let i=0;i<6;i++){ const a=i/6*Math.PI*2;
-      ctx.beginPath(); ctx.arc(Math.cos(a)*r*.1, Math.sin(a)*r*.1, r*.03, 0, Math.PI*2); ctx.fill(); }
+    // outer red petals, heart-shaped with a notch
+    for (let i=0;i<5;i++){
+      const a = -Math.PI/2 + i/5*Math.PI*2;
+      const px=Math.cos(a), py=Math.sin(a);
+      const tx=-py, ty=px;                                // tangent
+      const R=r*.82, w=r*.4;
+      const rg = ctx.createRadialGradient(px*R*.5,py*R*.5,r*.05, px*R,py*R,R);
+      rg.addColorStop(0,"#d4473a"); rg.addColorStop(1,"#9c2c24");
+      ctx.fillStyle = rg;
+      ctx.beginPath();
+      ctx.moveTo(px*r*.12, py*r*.12);
+      ctx.quadraticCurveTo(px*R*.5+tx*w, py*R*.5+ty*w, px*R+tx*w*.6, py*R+ty*w*.6);
+      ctx.quadraticCurveTo(px*R*1.08, py*R*1.08, px*R, py*R);  // notch
+      ctx.quadraticCurveTo(px*R*1.08, py*R*1.08, px*R-tx*w*.6, py*R-ty*w*.6);
+      ctx.quadraticCurveTo(px*R*.5-tx*w, py*R*.5-ty*w, px*r*.12, py*r*.12);
+      ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = "rgba(90,20,16,.5)"; ctx.lineWidth=r*.02;
+      ctx.beginPath(); ctx.moveTo(px*r*.14,py*r*.14); ctx.lineTo(px*R*.85,py*R*.85); ctx.stroke(); // vein
+    }
+    // inner white petals
+    for (let i=0;i<5;i++){
+      const a = -Math.PI/2 + Math.PI/5 + i/5*Math.PI*2;
+      const px=Math.cos(a), py=Math.sin(a), tx=-py, ty=px, R=r*.5, w=r*.26;
+      ctx.fillStyle = i%2 ? "#f6f1e6" : "#efe7d6";
+      ctx.beginPath();
+      ctx.moveTo(0,0);
+      ctx.quadraticCurveTo(px*R*.5+tx*w, py*R*.5+ty*w, px*R, py*R);
+      ctx.quadraticCurveTo(px*R*.5-tx*w, py*R*.5-ty*w, 0,0);
+      ctx.closePath(); ctx.fill();
+      ctx.strokeStyle="rgba(150,140,120,.5)"; ctx.lineWidth=r*.015; ctx.stroke();
+    }
+    // the seeded golden centre
+    const cg = ctx.createRadialGradient(-r*.04,-r*.04,r*.02,0,0,r*.22);
+    cg.addColorStop(0,gHi); cg.addColorStop(1,gD);
+    ctx.fillStyle = cg;
+    ctx.beginPath(); ctx.arc(0,0,r*.21,0,Math.PI*2); ctx.fill(); outline(.025);
+    ctx.fillStyle = gDk;
+    for (let i=0;i<8;i++){ const a=i/8*Math.PI*2;
+      ctx.beginPath(); ctx.arc(Math.cos(a)*r*.11, Math.sin(a)*r*.11, r*.028, 0, Math.PI*2); ctx.fill(); }
+    ctx.beginPath(); ctx.arc(0,0,r*.03,0,Math.PI*2); ctx.fill();
   }
   ctx.restore();
 }
 const EMBLEM = { goldenhind:"hind", desire:"rose", duke:"coronet", centurion:"eagle" };
-// a finished crest: the device on a dark roundel with a gold rim
+// a finished crest: the device on a dark roundel with a gold rim, drawn
+// at high resolution so the fine detail stays crisp
 function drawCrest(cv, key){
-  const ctx = cv.getContext("2d"), s = cv.width = cv.height = 72, c = s/2;
+  const s = 200, c = s/2;
+  cv.width = cv.height = s;
+  const ctx = cv.getContext("2d");
   ctx.clearRect(0,0,s,s);
-  ctx.fillStyle = "#13263a";
-  ctx.beginPath(); ctx.arc(c,c,c-3,0,Math.PI*2); ctx.fill();
-  ctx.strokeStyle = "#e7c24a"; ctx.lineWidth = 3;
-  ctx.beginPath(); ctx.arc(c,c,c-3,0,Math.PI*2); ctx.stroke();
-  ctx.strokeStyle = "rgba(231,194,74,.35)"; ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.arc(c,c,c-7,0,Math.PI*2); ctx.stroke();
-  drawEmblem(ctx, c, c, c*.62, key);
+  const bg = ctx.createRadialGradient(c,c*.8,8,c,c,c);
+  bg.addColorStop(0,"#1b3550"); bg.addColorStop(1,"#0e1f30");
+  ctx.fillStyle = bg;
+  ctx.beginPath(); ctx.arc(c,c,c-6,0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle = "#e7c24a"; ctx.lineWidth = 7;
+  ctx.beginPath(); ctx.arc(c,c,c-6,0,Math.PI*2); ctx.stroke();
+  ctx.strokeStyle = "rgba(231,194,74,.4)"; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(c,c,c-14,0,Math.PI*2); ctx.stroke();
+  drawEmblem(ctx, c, c, c*.6, key);
 }
 
 // ----------------------------------------------------- build the cards
@@ -528,7 +652,8 @@ function launch(){ location.href = "play.html?ship=" + CAPS[sel].key; }
 // Enter that brought us here is a user gesture); fall back to the first
 // interaction on this page if the browser blocks it.
 const gren = document.getElementById("gren");
-gren.volume = .5;
+let muted = localStorage.getItem("pg_muted") === "1";
+gren.volume = .5; gren.muted = muted;
 function startMusic(){ if (gren.paused) gren.play().catch(()=>{}); }
 startMusic();
 addEventListener("keydown", startMusic, { once:false });
@@ -539,6 +664,10 @@ addEventListener("keydown", e => {
   else if (e.key === "ArrowLeft"){ sel = (sel-1+CAPS.length) % CAPS.length; mark(); }
   else if (e.key === "Enter"){ launch(); }
   else if (e.key === "Escape"){ location.href = "index.html"; }
+  else if (e.key === "m" || e.key === "M"){
+    muted = !muted; gren.muted = muted;
+    localStorage.setItem("pg_muted", muted ? "1" : "0");
+  }
   else if (/^[1-4]$/.test(e.key)){ sel = +e.key - 1; mark(); launch(); }
 });
 </script>

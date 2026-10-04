@@ -174,12 +174,10 @@ function drawWater(){
     }
     bandCache = { oc, k:T.k, cx:Math.round(cam.x/6), cy:Math.round(cam.y/6) };
   }
+  // upscaling the low-res band map with smoothing gives soft gradients
+  // without the cost of a full-screen blur every frame
   ctx.imageSmoothingEnabled = true;
-  // soften the band edges: a chart shows hard curves, the sea does not
-  ctx.save();
-  ctx.filter = "blur(7px)";
-  ctx.drawImage(bandCache.oc, -8, -8, W+step2+16, H+step2+16);
-  ctx.restore();
+  ctx.drawImage(bandCache.oc, 0, 0, W+step2, H+step2);
 }
 
 // sun on the water: small hard glints, world-anchored so they stream
@@ -196,7 +194,7 @@ function drawGlints(t){
       const h = (((i*73856093) ^ (j*19349663)) >>> 0);
       const fx = i*cell + (h % 997)/997*cell;
       const fy = j*cell + ((h>>10) % 991)/991*cell;
-      if (CV.onLand(fx, fy)) continue;
+      if (CV.depthAt(fx, fy) < 6) continue;        // cheap grid lookup, not a ray cast
       const ph = (h % 628)/100;
       const tw = Math.max(0, Math.sin(t*1.7 + ph));
       ctx.globalAlpha = tw*tw*tw * .5;
@@ -222,6 +220,33 @@ function onScreenW(x, y, pad){
   const sx = T.X(x), sy = T.Y(y);
   return sx > -pad && sx < W+pad && sy > -pad && sy < H+pad;
 }
+// The scrub, dust and granite are STATIC, so compute them ONCE (with the
+// costly onLand / distToShore tests done here, not every frame) and just
+// blit the on-screen ones each frame.
+const LAND_FEATURES = (() => {
+  const out = [];
+  for (let i = 0; i < 1500; i++){
+    const x = -5200 + rnd2(i*3) * 10400, y = -2600 + rnd2(i*3+1) * 1700;
+    if (!CV.onLand(x, y)) continue;
+    if (rnd2(i*3+2) > Math.min(1, CV.distToShore(x, y) / 160) * .9 + .1) continue;
+    out.push({ x, y, r: 2.5 + rnd2(i*7)*6, rx: .8,
+      col: rnd2(i*5) > .55 ? "rgba(116,134,76,.5)" : "rgba(92,112,64,.45)" });
+  }
+  for (let i = 0; i < 500; i++){
+    const x = -5200 + rnd2(i*11+5) * 10400, y = -2600 + rnd2(i*11+6) * 1700;
+    if (!CV.onLand(x, y)) continue;
+    out.push({ x, y, r: 6 + rnd2(i*11+7)*14, rx: .7, col: "rgba(228,208,160,.22)" });
+  }
+  for (let i = 0; i < 160; i++){
+    const f = rnd2(i*13+1);
+    const x = f*205 + (rnd2(i*13+2)-.5)*170, y = f*-430 + (rnd2(i*13+3)-.5)*170;
+    if (!CV.onLand(x, y)) continue;
+    out.push({ x, y, r: 3.5 + rnd2(i*13+4)*8, rx: .85,
+      col: rnd2(i*13+5) > .5 ? "rgba(192,178,152,.5)" : "rgba(156,142,118,.45)" });
+  }
+  return out;
+})();
+
 function drawLand(t){
   poly(CV.LAND);
   ctx.fillStyle = "#d9c391";                     // sunstruck arid ground
@@ -230,43 +255,12 @@ function drawLand(t){
   ctx.save();
   poly(CV.LAND); ctx.clip();
 
-  // desert scrub, thicker inland, thorn-green and dust
-  for (let i = 0; i < 1500; i++){
-    const x = -5200 + rnd2(i*3) * 10400;
-    const y = -2600 + rnd2(i*3+1) * 1700;
-    if (!onScreenW(x, y, 60)) continue;
-    if (!CV.onLand(x, y)) continue;
-    const ds = CV.distToShore(x, y);
-    if (rnd2(i*3+2) > Math.min(1, ds / 160) * .9 + .1) continue;
-    const r = 2.5 + rnd2(i*7)*6;
-    ctx.fillStyle = rnd2(i*5) > .55 ? "rgba(116,134,76,.5)" : "rgba(92,112,64,.45)";
+  // the static land dressing: only the features currently on screen
+  for (const f of LAND_FEATURES){
+    if (!onScreenW(f.x, f.y, 40)) continue;
+    ctx.fillStyle = f.col;
     ctx.beginPath();
-    ctx.ellipse(T.X(x), T.Y(y), T.S(r), T.S(r*.8), 0, 0, Math.PI*2);
-    ctx.fill();
-  }
-  // dust and bare rock patches
-  for (let i = 0; i < 500; i++){
-    const x = -5200 + rnd2(i*11+5) * 10400;
-    const y = -2600 + rnd2(i*11+6) * 1700;
-    if (!onScreenW(x, y, 60)) continue;
-    if (!CV.onLand(x, y)) continue;
-    const r = 6 + rnd2(i*11+7)*14;
-    ctx.fillStyle = "rgba(228,208,160,.22)";
-    ctx.beginPath();
-    ctx.ellipse(T.X(x), T.Y(y), T.S(r), T.S(r*.7), 0, 0, Math.PI*2);
-    ctx.fill();
-  }
-  // the granite of Land's End: grey-gold stone over the whole ridge
-  for (let i = 0; i < 160; i++){
-    const f = rnd2(i*13+1);
-    const rx = f * 205, ry = f * -430;           // along the ridge line
-    const x = rx + (rnd2(i*13+2)-.5)*170;
-    const y = ry + (rnd2(i*13+3)-.5)*170;
-    if (!CV.onLand(x, y)) continue;
-    const r = 3.5 + rnd2(i*13+4)*8;
-    ctx.fillStyle = rnd2(i*13+5) > .5 ? "rgba(192,178,152,.5)" : "rgba(156,142,118,.45)";
-    ctx.beginPath();
-    ctx.ellipse(T.X(x), T.Y(y), T.S(r), T.S(r*.85), 0, 0, Math.PI*2);
+    ctx.ellipse(T.X(f.x), T.Y(f.y), T.S(f.r), T.S(f.r*f.rx), 0, 0, Math.PI*2);
     ctx.fill();
   }
 

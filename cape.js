@@ -105,8 +105,9 @@ export function onLand(x, y) {
 
 // depth: the bank is steep here (the canyon), so it deepens fast off
 // the beach, faster still off the granite. Rocks carry their own
-// shallows.
-export function depthAt(x, y) {
+// shallows. Computed analytically here, then baked into a grid below so
+// the live game only ever does a cheap lookup.
+function depthRaw(x, y) {
   if (onLand(x, y)) return -4;
   let ft = Math.min(260, distToShore(x, y) * .5);
   for (const r of ROCKS) {
@@ -114,6 +115,27 @@ export function depthAt(x, y) {
     if (d < r.r * 3) ft = Math.min(ft, (d - r.r) * .9);
   }
   return ft;
+}
+
+// ---- the depth grid, built once at load. depthAt() is then an O(1)
+// bilinear lookup, so recolouring the water as the camera moves costs
+// almost nothing (the old per-call coastline scan was the main lag).
+const G = { x0: -6200, y0: -3000, x1: 6200, y1: 1600, cell: 36 };
+G.nx = Math.ceil((G.x1 - G.x0) / G.cell) + 1;
+G.ny = Math.ceil((G.y1 - G.y0) / G.cell) + 1;
+const grid = new Float32Array(G.nx * G.ny);
+(function buildDepth(){
+  for (let j = 0; j < G.ny; j++)
+    for (let i = 0; i < G.nx; i++)
+      grid[j*G.nx + i] = depthRaw(G.x0 + i*G.cell, G.y0 + j*G.cell);
+})();
+export function depthAt(x, y) {
+  const fx = (x - G.x0) / G.cell, fy = (y - G.y0) / G.cell;
+  if (fx < 0 || fy < 0 || fx >= G.nx-1 || fy >= G.ny-1) return 260;  // open sea
+  const i = fx|0, j = fy|0, tx = fx-i, ty = fy-j;
+  const a = grid[j*G.nx+i], b = grid[j*G.nx+i+1];
+  const c = grid[(j+1)*G.nx+i], d = grid[(j+1)*G.nx+i+1];
+  return (a*(1-tx)+b*tx)*(1-ty) + (c*(1-tx)+d*tx)*ty;
 }
 
 // the ridge gives the bay its lee in the north-west wind, which is

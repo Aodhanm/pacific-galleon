@@ -427,6 +427,7 @@ function fire(){
   const c = ship.cls;
   const nG = Math.max(3, Math.floor(c.len / 7));
   sfxBroadside(nG);
+  sfxWhistle(Math.min(1, g.d / RANGE));
   const fx = Math.sin(ship.hdg), fy = -Math.cos(ship.hdg);
   const sx2 = Math.cos(ship.hdg), sy2 = Math.sin(ship.hdg);
   for (let i = 0; i < nG; i++){
@@ -467,6 +468,7 @@ function prizeFire(){
   const fx = Math.sin(prize.hdg), fy = -Math.cos(prize.hdg);
   const sx2 = Math.cos(prize.hdg), sy2 = Math.sin(prize.hdg);
   sfxBroadside(nG);
+  sfxWhistle(Math.min(1, g.d / RANGE));
   for (let i = 0; i < nG; i++){
     const along = -c.len*.26 + (i+.5)*(c.len*.5/nG);
     const gx = prize.x + fx*along + sx2*g.side*c.beam*.5;
@@ -626,7 +628,7 @@ function prizeStep(dt){
 // so the game owns its audio outright: the sea bed, the guns, shot
 // striking home or falling short, canvas being worked, and the wreck.
 let A = null, sfxGain = null, seaGain = null, seaFilt = null;
-let windGain = null, windFilt = null, shotBuf = null, cashBuf = null;
+let windGain = null, windFilt = null, shotBuf = null, cashBuf = null, whistleBuf = null;
 function audioInit(){
   if (A) return;
   try { A = new (window.AudioContext || window.webkitAudioContext)(); } catch(e){ return; }
@@ -638,6 +640,8 @@ function audioInit(){
     .then(b => A.decodeAudioData(b)).then(b => { shotBuf = b; }).catch(()=>{});
   fetch("cash.m4a").then(r => r.arrayBuffer())
     .then(b => A.decodeAudioData(b)).then(b => { cashBuf = b; }).catch(()=>{});
+  fetch("whistle.m4a").then(r => r.arrayBuffer())
+    .then(b => A.decodeAudioData(b)).then(b => { whistleBuf = b; }).catch(()=>{});
   const len = A.sampleRate * 2;
   const buf = A.createBuffer(1, len, A.sampleRate);
   const d = buf.getChannelData(0);
@@ -726,6 +730,20 @@ function sfxBroadside(nG){
     s2.connect(g); g.connect(sfxGain); s2.start();
   }
   tone("triangle", 72 + Math.random()*14, 28, .5, .3);
+}
+// the shot whistling away toward a distant target. range 0..1 of RANGE.
+function sfxWhistle(range){
+  if (!A || !whistleBuf || range < .35) return;        // only an "away" shot
+  const s2 = A.createBufferSource(); s2.buffer = whistleBuf;
+  // a shorter flight whistles higher and quicker; a long one draws out
+  s2.playbackRate.value = 1.7 - range*.7;
+  const g = A.createGain(); g.gain.value = .0001;
+  s2.connect(g); g.connect(sfxGain);
+  const t0 = A.currentTime + .12;                        // just after the bang
+  g.gain.setValueAtTime(.0001, t0);
+  g.gain.exponentialRampToValueAtTime(.3 + .35*range, t0 + .1);
+  g.gain.exponentialRampToValueAtTime(.0001, t0 + .3 + range*.5);
+  s2.start(t0);
 }
 // treasure over the rail: the cash register, cut short
 function sfxChest(){

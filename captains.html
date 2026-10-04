@@ -1,17 +1,19 @@
 <meta charset="utf-8">
 <title>Pacific Galleon &mdash; choose your captain</title>
 <style>
-  :root{ --display: Trattatello, Luminari, "Academy Engraved LET", serif; }
+  :root{ --display: Trattatello, Luminari, "Academy Engraved LET", serif;
+         --ui: "Helvetica Neue", Helvetica, Arial, system-ui, sans-serif; }
   *{box-sizing:border-box}
   html,body{height:100%}
   body{margin:0;min-height:100%;background:#15486a;overflow-x:hidden;
-    font-family:var(--display);color:#eaf1f5;-webkit-font-smoothing:antialiased;
+    font-family:var(--ui);color:#eaf1f5;-webkit-font-smoothing:antialiased;
     background:linear-gradient(#2b6f93 0%, #1d5f86 46%, #134b6c 100%)}
   h1{text-align:center;font-weight:400;color:#f2f6f9;letter-spacing:.05em;
-    font-size:clamp(26px,3.8vw,52px);margin:clamp(14px,3vh,34px) 0 .1em;
+    font-family:var(--display);
+    font-size:clamp(28px,4vw,56px);margin:clamp(14px,3vh,34px) 0 .1em;
     text-shadow:0 2px 0 rgba(0,0,0,.2), 0 6px 18px rgba(8,24,36,.4)}
-  .sub{text-align:center;color:#bcd4e2;letter-spacing:.14em;
-    font-size:clamp(11px,1.2vw,15px);margin-bottom:clamp(10px,2vh,24px)}
+  .sub{text-align:center;color:#cfe0ea;letter-spacing:.16em;
+    font-size:clamp(11px,1.1vw,14px);margin-bottom:clamp(10px,2vh,24px)}
   .row{display:flex;gap:clamp(10px,1.6vw,22px);justify-content:center;
     flex-wrap:wrap;padding:0 16px 20px;max-width:1500px;margin:0 auto}
   .card{width:clamp(210px,21vw,290px);background:rgba(10,30,44,.42);
@@ -24,16 +26,16 @@
     overflow:hidden;background:radial-gradient(120% 120% at 40% 30%, #3a5064, #1a2c3a);
     border:1px solid rgba(0,0,0,.35)}
   .frame canvas{position:absolute;inset:0;width:100%;height:100%}
-  .nm{font-size:clamp(17px,1.5vw,23px);color:#f2f6f9;margin:.5em 0 0;text-align:center;
-    letter-spacing:.03em}
+  .nm{font-size:clamp(16px,1.4vw,21px);font-weight:700;color:#f2f6f9;margin:.55em 0 0;
+    text-align:center;letter-spacing:.06em}
   .yr{text-align:center;color:#f2a63c;font-size:clamp(11px,1vw,14px);letter-spacing:.1em}
-  .ship{text-align:center;color:#bcd4e2;font-size:clamp(12px,1.05vw,15px);
-    font-style:italic;margin:.25em 0 .1em}
-  .blurb{color:#9fb6c4;font-size:clamp(10px,.86vw,12.5px);line-height:1.5;
-    text-align:center;margin:.3em 2px .5em;min-height:3.2em}
+  .ship{text-align:center;color:#cfe0ea;font-size:clamp(12px,1.05vw,15px);
+    font-style:italic;margin:.3em 0 .1em}
+  .blurb{color:#cfe0ea;font-size:clamp(11px,.92vw,13.5px);line-height:1.55;
+    text-align:center;margin:.4em 2px .6em;min-height:3.4em}
   .stats{margin-top:.2em}
-  .stat{display:flex;align-items:center;gap:7px;font-size:clamp(9px,.8vw,11.5px);
-    color:#bcd4e2;letter-spacing:.04em;line-height:1.9}
+  .stat{display:flex;align-items:center;gap:8px;font-size:clamp(10px,.86vw,12.5px);
+    color:#cfe0ea;letter-spacing:.02em;line-height:2.0}
   .stat .lab{width:4.7em;text-align:right;color:#8fa8b8}
   .bar{flex:1;height:6px;background:rgba(150,170,184,.18);border-radius:3px;overflow:hidden}
   .bar i{display:block;height:100%;background:linear-gradient(90deg,#c8781f,#f2a63c)}
@@ -46,6 +48,7 @@
 <h1>Choose your captain</h1>
 <div class="sub">THE ENGLISH RAIDERS OF THE PACIFIC &middot; 1579 &ndash; 1743</div>
 <div class="row" id="row"></div>
+<audio id="gren" src="grenadiers.m4a" loop preload="auto"></audio>
 <div class="hint">&larr; &rarr; to choose &nbsp;&middot;&nbsp; <b>Enter</b> or click to sail &nbsp;&middot;&nbsp;
   <b>Esc</b> back to the title</div>
 
@@ -126,6 +129,38 @@ function portrait(cv, L){
   ctx.beginPath();
   ctx.moveTo(cx-64, H*.67); ctx.quadraticCurveTo(cx, H*.61, cx+64, H*.67);
   ctx.stroke();
+  // a row of buttons down the breast, and lace/embroidery either side
+  if (L.era === "geo1" || L.era === "geo2"){
+    ctx.fillStyle = L.trim;
+    for (let i = 0; i < 4; i++){
+      ctx.beginPath(); ctx.arc(cx-6, H*.78 + i*H*.05, 3.2, 0, Math.PI*2); ctx.fill();
+    }
+    ctx.strokeStyle = L.trim; ctx.lineWidth = 2; ctx.globalAlpha = .8;
+    for (let i = 0; i < 4; i++){
+      const y = H*.78 + i*H*.05;
+      ctx.beginPath(); ctx.moveTo(cx-2, y); ctx.lineTo(cx+16, y); ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    if (L.era === "geo2"){     // a bullion epaulette on the shoulder
+      ctx.fillStyle = L.trim;
+      ctx.beginPath(); ctx.ellipse(cx-78, H*.7, 16, 9, -.3, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = shade(L.trim,-30);
+      for (let i=0;i<5;i++){ ctx.fillRect(cx-90+i*5, H*.72, 2, 14); }  // fringe
+    }
+  } else {
+    // Elizabethan doublet: a line of small studs and slashed trim
+    ctx.fillStyle = L.trim;
+    for (let i = 0; i < 5; i++){
+      ctx.beginPath(); ctx.arc(cx, H*.72 + i*H*.045, 2.6, 0, Math.PI*2); ctx.fill();
+    }
+    ctx.strokeStyle = L.trim; ctx.lineWidth = 1.5; ctx.globalAlpha = .55;
+    for (const sx of [-1,1]) for (let i=0;i<4;i++){
+      ctx.beginPath();
+      ctx.moveTo(cx+sx*18, H*.73+i*H*.05); ctx.lineTo(cx+sx*40, H*.75+i*H*.05);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
 
   // ---- the neckwear
   if (L.ruff){
@@ -177,17 +212,44 @@ function portrait(cv, L){
   ctx.beginPath();
   ctx.ellipse(cx+18, faceY+4, faceR*.5, faceR*.86, 0, -Math.PI*.4, Math.PI*.6); ctx.fill();
 
-  // brow, eyes, nose, mouth
-  ctx.fillStyle = "#2a1e16";
-  ctx.beginPath(); ctx.ellipse(cx-18, faceY-6, 5, 3.2, 0, 0, Math.PI*2); ctx.fill();
-  ctx.beginPath(); ctx.ellipse(cx+18, faceY-6, 5, 3.2, 0, 0, Math.PI*2); ctx.fill();
+  // a warm cheek and a highlight down the lit side of the face
+  ctx.fillStyle = "rgba(200,120,90,.16)";
+  ctx.beginPath(); ctx.ellipse(cx-22, faceY+10, 10, 7, 0, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(cx+22, faceY+10, 10, 7, 0, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = "rgba(255,245,230,.18)";
+  ctx.beginPath(); ctx.ellipse(cx-16, faceY-2, 14, 26, -.2, 0, Math.PI*2); ctx.fill();
+
+  // the eyes: white, iris, pupil, a catchlight
+  for (const sx of [-1,1]){
+    const ex = cx + sx*18, ey = faceY-6;
+    ctx.fillStyle = "#f2ece2";
+    ctx.beginPath(); ctx.ellipse(ex, ey, 6.5, 4, 0, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = "#5a4433";
+    ctx.beginPath(); ctx.arc(ex+sx*1, ey, 3, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = "#1a120c";
+    ctx.beginPath(); ctx.arc(ex+sx*1, ey, 1.5, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath(); ctx.arc(ex+sx*1-1.4, ey-1.4, .9, 0, Math.PI*2); ctx.fill();
+    // upper lid line
+    ctx.strokeStyle = shade(L.skin,-55); ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.moveTo(ex-6.5, ey-2); ctx.quadraticCurveTo(ex, ey-5.5, ex+6.5, ey-2); ctx.stroke();
+  }
+  // nose, with a soft shadow
   ctx.strokeStyle = shade(L.skin,-40); ctx.lineWidth = 2; ctx.lineCap="round";
   ctx.beginPath(); ctx.moveTo(cx-2, faceY-2); ctx.lineTo(cx-5, faceY+12);
-  ctx.lineTo(cx+2, faceY+14); ctx.stroke();           // nose
+  ctx.lineTo(cx+3, faceY+14); ctx.stroke();
+  ctx.fillStyle = "rgba(120,70,50,.12)";
+  ctx.beginPath(); ctx.ellipse(cx+5, faceY+8, 5, 10, 0, 0, Math.PI*2); ctx.fill();
+  // mouth (only clearly if no beard covering it)
+  if (L.beard !== "pointed"){
+    ctx.strokeStyle = "#8a4b3c"; ctx.lineWidth = 2.4;
+    ctx.beginPath(); ctx.moveTo(cx-9, faceY+22);
+    ctx.quadraticCurveTo(cx, faceY+25, cx+9, faceY+22); ctx.stroke();
+  }
   // eyebrows
-  ctx.strokeStyle = shade(L.hair,-10); ctx.lineWidth = 3;
-  ctx.beginPath(); ctx.moveTo(cx-26, faceY-16); ctx.lineTo(cx-10, faceY-18);
-  ctx.moveTo(cx+10, faceY-18); ctx.lineTo(cx+26, faceY-16); ctx.stroke();
+  ctx.strokeStyle = shade(L.hair,-10); ctx.lineWidth = 3.2; ctx.lineCap="round";
+  ctx.beginPath(); ctx.moveTo(cx-27, faceY-15); ctx.quadraticCurveTo(cx-18, faceY-19, cx-9, faceY-17);
+  ctx.moveTo(cx+9, faceY-17); ctx.quadraticCurveTo(cx+18, faceY-19, cx+27, faceY-15); ctx.stroke();
 
   // ---- hair / wig, drawn behind is approximated by drawing over the crown
   if (L.era === "geo2"){
@@ -282,6 +344,16 @@ function mark(){
   [...row.children].forEach((el,i) => el.classList.toggle("sel", i===sel));
 }
 function launch(){ location.href = "play.html?ship=" + CAPS[sel].key; }
+
+// the British Grenadiers plays through the choosing. Try at once (the
+// Enter that brought us here is a user gesture); fall back to the first
+// interaction on this page if the browser blocks it.
+const gren = document.getElementById("gren");
+gren.volume = .5;
+function startMusic(){ if (gren.paused) gren.play().catch(()=>{}); }
+startMusic();
+addEventListener("keydown", startMusic, { once:false });
+addEventListener("pointerdown", startMusic, { once:false });
 
 addEventListener("keydown", e => {
   if (e.key === "ArrowRight"){ sel = (sel+1) % CAPS.length; mark(); }

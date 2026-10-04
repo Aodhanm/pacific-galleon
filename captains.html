@@ -64,19 +64,27 @@ import { CLASSES } from "./ships.js";
 const CAPS = [
   { key:"goldenhind", name:"DRAKE",     years:"1577 – 80",
     blurb:"The first Englishman round the world, and the terror of the Pacific. Took the treasure ship Cacafuego off Peru.",
-    look:{ era:"eliz", hair:"#7a4a26", beard:"pointed", skin:"#e8c6a4",
+    // weathered, broad-faced, a full red beard
+    look:{ era:"eliz", hair:"#8a4a22", beard:"full", skin:"#dcab80", age:.65,
+           faceW:1.08, faceH:1.0, brow:"level", nose:"broad",
            coat:"#3a2a46", trim:"#d9a441", ruff:true, hat:"flatcap", hatCol:"#241733" } },
   { key:"desire",     name:"CAVENDISH", years:"1586 – 88",
     blurb:"Youngest to circumnavigate. Off this very cape, 1587, he battered the Santa Ana until she struck.",
-    look:{ era:"eliz", hair:"#2a1e14", beard:"pointed", skin:"#e8c6a4",
+    // young, narrow pale face, a sharp dark spade beard
+    look:{ era:"eliz", hair:"#241a12", beard:"spade", skin:"#ead3b2", age:.12,
+           faceW:.85, faceH:1.06, brow:"raised", nose:"fine",
            coat:"#5a1f27", trim:"#d9a441", ruff:true, hat:"none" } },
   { key:"duke",       name:"WOODES ROGERS", years:"1708 – 11",
     blurb:"Bristol privateer who rescued Alexander Selkirk and took a Manila galleon off California with the Duke and Dutchess.",
-    look:{ era:"geo1", hair:"#6a4a2c", beard:"none", skin:"#e6c09a",
+    // long strong-jawed face, clean-shaven, a hard set to the mouth
+    look:{ era:"geo1", hair:"#5a3c22", beard:"none", skin:"#dcae86", age:.5,
+           faceW:.9, faceH:1.14, brow:"stern", nose:"straight", jaw:"long",
            coat:"#6b3a22", trim:"#caa25a", cravat:true } },
   { key:"centurion",  name:"ANSON",     years:"1740 – 44",
     blurb:"Circled the globe and took the Covadonga in a fierce gun-duel. His real enemy was scurvy, not Spain.",
-    look:{ era:"geo2", hair:"#e8e6dc", beard:"none", skin:"#e6c09a",
+    // older, full round face and jowls, calm and heavy-lidded
+    look:{ era:"geo2", hair:"#e8e6dc", beard:"none", skin:"#e6c6a0", age:.6,
+           faceW:1.16, faceH:.96, brow:"level", nose:"bulb", jaw:"round", jowls:true,
            coat:"#1f3560", trim:"#d9bc58", cravat:true, facings:"#f0ece0" } },
 ];
 
@@ -202,54 +210,94 @@ function portrait(cv, L){
   ctx.fillStyle = shade(L.skin, -14);
   ctx.fillRect(cx-16, H*.5, 32, H*.12);
 
-  // ---- the head
+  // ---- the head: shape varies per captain (width, height, jaw)
+  const fw = (L.faceW || 1), fh = (L.faceH || 1);
   const faceY = H*.37, faceR = 52;
+  const hw = faceR*.84*fw, hh = faceR*fh;
   ctx.fillStyle = L.skin;
-  ctx.beginPath();
-  ctx.ellipse(cx, faceY, faceR*.84, faceR, 0, 0, Math.PI*2); ctx.fill();
-  // a little side shadow for form
+  if (L.jaw === "long"){
+    // a long, square-jawed face
+    ctx.beginPath();
+    ctx.moveTo(cx-hw, faceY-hh*.5);
+    ctx.quadraticCurveTo(cx-hw*1.02, faceY+hh*.2, cx-hw*.74, faceY+hh*.72);
+    ctx.quadraticCurveTo(cx-hw*.4, faceY+hh*1.02, cx, faceY+hh*1.04);
+    ctx.quadraticCurveTo(cx+hw*.4, faceY+hh*1.02, cx+hw*.74, faceY+hh*.72);
+    ctx.quadraticCurveTo(cx+hw*1.02, faceY+hh*.2, cx+hw, faceY-hh*.5);
+    ctx.quadraticCurveTo(cx, faceY-hh*1.04, cx-hw, faceY-hh*.5);
+    ctx.closePath(); ctx.fill();
+  } else {
+    // round / oval
+    ctx.beginPath(); ctx.ellipse(cx, faceY, hw, hh, 0, 0, Math.PI*2); ctx.fill();
+  }
+  if (L.jowls){                              // fuller cheeks and a soft jaw
+    ctx.fillStyle = L.skin;
+    ctx.beginPath(); ctx.ellipse(cx-hw*.6, faceY+hh*.5, hw*.4, hh*.34, 0, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(cx+hw*.6, faceY+hh*.5, hw*.4, hh*.34, 0, 0, Math.PI*2); ctx.fill();
+  }
+  // side shadow for form
   ctx.fillStyle = "rgba(0,0,0,.10)";
   ctx.beginPath();
-  ctx.ellipse(cx+18, faceY+4, faceR*.5, faceR*.86, 0, -Math.PI*.4, Math.PI*.6); ctx.fill();
+  ctx.ellipse(cx+hw*.4, faceY+4, hw*.5, hh*.84, 0, -Math.PI*.4, Math.PI*.6); ctx.fill();
 
-  // a warm cheek and a highlight down the lit side of the face
-  ctx.fillStyle = "rgba(200,120,90,.16)";
-  ctx.beginPath(); ctx.ellipse(cx-22, faceY+10, 10, 7, 0, 0, Math.PI*2); ctx.fill();
-  ctx.beginPath(); ctx.ellipse(cx+22, faceY+10, 10, 7, 0, 0, Math.PI*2); ctx.fill();
-  ctx.fillStyle = "rgba(255,245,230,.18)";
-  ctx.beginPath(); ctx.ellipse(cx-16, faceY-2, 14, 26, -.2, 0, Math.PI*2); ctx.fill();
+  // ruddy cheeks (stronger on weathered faces) and a lit highlight
+  const ruddy = .1 + (L.age||0)*.14;
+  ctx.fillStyle = `rgba(200,110,80,${ruddy})`;
+  ctx.beginPath(); ctx.ellipse(cx-hw*.5, faceY+hh*.2, 11, 8, 0, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(cx+hw*.5, faceY+hh*.2, 11, 8, 0, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = "rgba(255,245,230,.16)";
+  ctx.beginPath(); ctx.ellipse(cx-hw*.35, faceY-hh*.05, 13, hh*.52, -.2, 0, Math.PI*2); ctx.fill();
 
-  // the eyes: white, iris, pupil, a catchlight
+  // eye spacing scales with face width
+  const es = 18*fw, ey = faceY-6;
+  const lid = L.brow === "stern" ? -2 : 0;   // heavier lids for a hard look
   for (const sx of [-1,1]){
-    const ex = cx + sx*18, ey = faceY-6;
+    const ex = cx + sx*es;
     ctx.fillStyle = "#f2ece2";
-    ctx.beginPath(); ctx.ellipse(ex, ey, 6.5, 4, 0, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(ex, ey, 6.3, 3.8, 0, 0, Math.PI*2); ctx.fill();
     ctx.fillStyle = "#5a4433";
-    ctx.beginPath(); ctx.arc(ex+sx*1, ey, 3, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(ex+sx*1, ey, 2.9, 0, Math.PI*2); ctx.fill();
     ctx.fillStyle = "#1a120c";
     ctx.beginPath(); ctx.arc(ex+sx*1, ey, 1.5, 0, Math.PI*2); ctx.fill();
     ctx.fillStyle = "#ffffff";
     ctx.beginPath(); ctx.arc(ex+sx*1-1.4, ey-1.4, .9, 0, Math.PI*2); ctx.fill();
-    // upper lid line
-    ctx.strokeStyle = shade(L.skin,-55); ctx.lineWidth = 1.4;
-    ctx.beginPath(); ctx.moveTo(ex-6.5, ey-2); ctx.quadraticCurveTo(ex, ey-5.5, ex+6.5, ey-2); ctx.stroke();
+    ctx.strokeStyle = shade(L.skin,-55); ctx.lineWidth = 1.4 + (lid?1:0);
+    ctx.beginPath(); ctx.moveTo(ex-6.3, ey-2+lid); ctx.quadraticCurveTo(ex, ey-5.5+lid, ex+6.3, ey-2+lid); ctx.stroke();
   }
-  // nose, with a soft shadow
+  // nose: length and width per captain
+  const nl = L.nose==="bulb" ? 14 : L.nose==="broad" ? 13 : L.nose==="fine" ? 15 : 14;
+  const nwd = L.nose==="broad"||L.nose==="bulb" ? 7 : L.nose==="fine" ? 3 : 5;
   ctx.strokeStyle = shade(L.skin,-40); ctx.lineWidth = 2; ctx.lineCap="round";
-  ctx.beginPath(); ctx.moveTo(cx-2, faceY-2); ctx.lineTo(cx-5, faceY+12);
-  ctx.lineTo(cx+3, faceY+14); ctx.stroke();
-  ctx.fillStyle = "rgba(120,70,50,.12)";
-  ctx.beginPath(); ctx.ellipse(cx+5, faceY+8, 5, 10, 0, 0, Math.PI*2); ctx.fill();
-  // mouth (only clearly if no beard covering it)
-  if (L.beard !== "pointed"){
-    ctx.strokeStyle = "#8a4b3c"; ctx.lineWidth = 2.4;
-    ctx.beginPath(); ctx.moveTo(cx-9, faceY+22);
-    ctx.quadraticCurveTo(cx, faceY+25, cx+9, faceY+22); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(cx-1, faceY-2); ctx.lineTo(cx-nwd*.7, faceY+nl);
+  ctx.lineTo(cx+nwd, faceY+nl+2); ctx.stroke();
+  if (L.nose==="bulb"){ ctx.fillStyle = shade(L.skin,8);
+    ctx.beginPath(); ctx.arc(cx, faceY+nl, nwd*.7, 0, Math.PI*2); ctx.fill(); }
+  ctx.fillStyle = "rgba(120,70,50,.1)";
+  ctx.beginPath(); ctx.ellipse(cx+5, faceY+nl*.6, 5, 10, 0, 0, Math.PI*2); ctx.fill();
+
+  // mouth, unless a beard hides it; set the line to the brow mood
+  if (L.beard === "none" || L.beard === "spade"){
+    ctx.strokeStyle = "#8a4b3c"; ctx.lineWidth = 2.4; ctx.lineCap="round";
+    const mY = faceY + nl + 9, curl = L.brow==="stern" ? -3 : L.brow==="raised" ? 3 : 0;
+    ctx.beginPath(); ctx.moveTo(cx-9, mY - curl*.3);
+    ctx.quadraticCurveTo(cx, mY + curl, cx+9, mY - curl*.3); ctx.stroke();
   }
-  // eyebrows
-  ctx.strokeStyle = shade(L.hair,-10); ctx.lineWidth = 3.2; ctx.lineCap="round";
-  ctx.beginPath(); ctx.moveTo(cx-27, faceY-15); ctx.quadraticCurveTo(cx-18, faceY-19, cx-9, faceY-17);
-  ctx.moveTo(cx+9, faceY-17); ctx.quadraticCurveTo(cx+18, faceY-19, cx+27, faceY-15); ctx.stroke();
+  // age lines for the older men
+  if ((L.age||0) > .4){
+    ctx.strokeStyle = "rgba(90,60,40,.25)"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(cx-hw*.5, faceY-hh*.42);
+    ctx.quadraticCurveTo(cx, faceY-hh*.5, cx+hw*.5, faceY-hh*.42); ctx.stroke();
+    for (const sx of [-1,1]){
+      ctx.beginPath(); ctx.moveTo(cx+sx*(es+7), ey+3);
+      ctx.lineTo(cx+sx*(es+11), ey+6); ctx.stroke();   // crow's feet
+    }
+  }
+  // eyebrows, shaped by mood
+  ctx.strokeStyle = shade(L.hair,-6); ctx.lineWidth = 3.2; ctx.lineCap="round";
+  const bI = L.brow==="stern" ? -3 : L.brow==="raised" ? 3 : 0;
+  ctx.beginPath();
+  ctx.moveTo(cx-es-9, ey-9-bI*.4); ctx.quadraticCurveTo(cx-es, ey-13+bI*.2, cx-es+9, ey-11-bI);
+  ctx.moveTo(cx+es-9, ey-11-bI); ctx.quadraticCurveTo(cx+es, ey-13+bI*.2, cx+es+9, ey-9-bI*.4);
+  ctx.stroke();
 
   // ---- hair / wig, drawn behind is approximated by drawing over the crown
   if (L.era === "geo2"){
@@ -295,20 +343,42 @@ function portrait(cv, L){
   }
 
   // ---- beard / moustache
-  if (L.beard === "pointed"){
+  const hw2 = faceR*.84*(L.faceW||1);
+  if (L.beard === "full"){
+    // a broad full beard framing the whole jaw, and a thick moustache
     ctx.fillStyle = L.hair;
-    // moustache
     ctx.beginPath();
-    ctx.moveTo(cx-16, faceY+20);
-    ctx.quadraticCurveTo(cx, faceY+16, cx+16, faceY+20);
-    ctx.quadraticCurveTo(cx, faceY+24, cx-16, faceY+20); ctx.fill();
-    // the pointed beard
-    ctx.beginPath();
-    ctx.moveTo(cx-20, faceY+26);
-    ctx.quadraticCurveTo(cx-14, faceY+44, cx, faceY+58);
-    ctx.quadraticCurveTo(cx+14, faceY+44, cx+20, faceY+26);
-    ctx.quadraticCurveTo(cx, faceY+34, cx-20, faceY+26);
+    ctx.moveTo(cx-hw2*.92, faceY+8);
+    ctx.quadraticCurveTo(cx-hw2*.8, faceY+48, cx, faceY+64);
+    ctx.quadraticCurveTo(cx+hw2*.8, faceY+48, cx+hw2*.92, faceY+8);
+    ctx.quadraticCurveTo(cx+hw2*.5, faceY+26, cx, faceY+24);
+    ctx.quadraticCurveTo(cx-hw2*.5, faceY+26, cx-hw2*.92, faceY+8);
     ctx.fill();
+    ctx.beginPath();                                // moustache over the lip
+    ctx.moveTo(cx-18, faceY+20);
+    ctx.quadraticCurveTo(cx, faceY+15, cx+18, faceY+20);
+    ctx.quadraticCurveTo(cx, faceY+25, cx-18, faceY+20); ctx.fill();
+    ctx.fillStyle = shade(L.hair,16);              // a little texture
+    ctx.beginPath(); ctx.ellipse(cx, faceY+40, hw2*.3, 10, 0, 0, Math.PI*2); ctx.fill();
+  } else if (L.beard === "spade"){
+    // a neat sharp spade/point, tight to a young face
+    ctx.fillStyle = L.hair;
+    ctx.beginPath();                                // thin moustache
+    ctx.moveTo(cx-13, faceY+19);
+    ctx.quadraticCurveTo(cx, faceY+16, cx+13, faceY+19);
+    ctx.quadraticCurveTo(cx, faceY+22, cx-13, faceY+19); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(cx-13, faceY+26);
+    ctx.quadraticCurveTo(cx-10, faceY+46, cx, faceY+60);
+    ctx.quadraticCurveTo(cx+10, faceY+46, cx+13, faceY+26);
+    ctx.quadraticCurveTo(cx, faceY+32, cx-13, faceY+26);
+    ctx.fill();
+    // a thin line of cheek hair up toward the ears
+    ctx.strokeStyle = L.hair; ctx.lineWidth = 3; ctx.lineCap="round";
+    for (const sx of [-1,1]){
+      ctx.beginPath(); ctx.moveTo(cx+sx*13, faceY+24);
+      ctx.quadraticCurveTo(cx+sx*hw2*.7, faceY+10, cx+sx*hw2*.78, faceY-10); ctx.stroke();
+    }
   }
 }
 function shade(hex, d){

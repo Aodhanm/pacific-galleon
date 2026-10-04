@@ -57,6 +57,17 @@ const shotPool = Array.from({length: 3}, () => {
   const a = new Audio("cannon-one.m4a"); a.volume = .55; return a;
 });
 let shotI = 0, audioOn = false;
+const gullSnd = ["gull1.m4a","gull2.m4a"].map(f => { const a = new Audio(f); a.volume = .3; return a; });
+let gullWait = 6 + Math.random()*8;
+function gullCry(){
+  if (!audioOn) return;
+  const a = gullSnd[(Math.random()*gullSnd.length)|0];
+  try { a.currentTime = 0; a.volume = .18 + Math.random()*.16; a.play().catch(()=>{}); } catch(e){}
+}
+function gullStep(dt){
+  gullWait -= dt;
+  if (gullWait <= 0){ gullCry(); gullWait = 9 + Math.random()*14; }   // now and then, no more
+}
 function shoot(){
   if (!audioOn) return;
   const a = shotPool[shotI = (shotI+1) % shotPool.length];
@@ -632,6 +643,7 @@ function frame(now){
   drawSea(t);
 
   battleStep(dt, t);
+  gullStep(dt);
 
   // the two of them, broadside to broadside off the cape:
   // the Englishman to windward on the left, the galleon to leeward

@@ -32,6 +32,7 @@
   </div>
 </div>
 <audio id="theme" src="theme-britannia.m4a" loop preload="auto"></audio>
+<audio id="shot" src="cannon-one.m4a" preload="auto"></audio>
 
 <script>
 // =====================================================================
@@ -50,6 +51,18 @@ function resize(){
   ctx.setTransform(d,0,0,d,0,0);
 }
 addEventListener("resize", resize); resize();
+
+// one cannon report per broadside: a small pool of the Victory single
+// shot, started muted until the first gesture so autoplay is happy
+const shotPool = Array.from({length: 3}, () => {
+  const a = new Audio("cannon-one.m4a"); a.volume = .55; return a;
+});
+let shotI = 0, audioOn = false;
+function shoot(){
+  if (!audioOn) return;
+  const a = shotPool[shotI = (shotI+1) % shotPool.length];
+  try { a.currentTime = 0; a.play().catch(()=>{}); } catch(e){}
+}
 
 const HORIZON = () => H * .52;
 
@@ -71,6 +84,21 @@ function drawSky(t){
   halo.addColorStop(1, "rgba(255,244,200,0)");
   ctx.fillStyle = halo;
   ctx.fillRect(sx-H*.3, sy-H*.3, H*.6, H*.6);
+  // shafts of light fanning down from it
+  ctx.save();
+  ctx.translate(sx, sy);
+  for (let i = 0; i < 7; i++){
+    const a = .9 + i*.16 + Math.sin(t*.05+i)*.02;
+    ctx.globalAlpha = .05 + .03*Math.sin(t*.3+i);
+    ctx.fillStyle = "#fff6d8";
+    ctx.beginPath();
+    ctx.moveTo(0,0);
+    ctx.lineTo(Math.cos(a)*H*1.2, Math.sin(a)*H*1.2);
+    ctx.lineTo(Math.cos(a+.05)*H*1.2, Math.sin(a+.05)*H*1.2);
+    ctx.closePath(); ctx.fill();
+  }
+  ctx.restore();
+  ctx.globalAlpha = 1;
   ctx.fillStyle = "#fffbe8";
   ctx.beginPath(); ctx.arc(sx, sy, H*.035, 0, Math.PI*2); ctx.fill();
 
@@ -90,6 +118,21 @@ function drawSky(t){
     ctx.fill();
   }
   ctx.globalAlpha = 1;
+
+  // a skein of frigatebirds riding the sea breeze
+  ctx.strokeStyle = "rgba(40,54,66,.55)";
+  ctx.lineWidth = Math.max(1, H*.0016);
+  for (let i = 0; i < 7; i++){
+    const bx = ((i*.17 + .3 - t*.012) % 1.25) * W;
+    const by = H*(.10 + .035*Math.sin(i*2.1)) + Math.sin(t*.5+i)*H*.004;
+    const s = H*.012 * (1 - i*.05);
+    const flap = Math.sin(t*3 + i*1.3) * .4;
+    ctx.beginPath();
+    ctx.moveTo(bx - s, by + s*flap);
+    ctx.quadraticCurveTo(bx - s*.3, by - s*.5, bx, by);
+    ctx.quadraticCurveTo(bx + s*.3, by - s*.5, bx + s, by + s*flap);
+    ctx.stroke();
+  }
 }
 
 // ------------------------------------------- the cape and the arch
@@ -159,6 +202,47 @@ function drawCape(t){
   ctx.lineTo(ax - aw*1.25, hz - ah*.42);
   ctx.lineTo(ax - aw*.95, hz);
   ctx.closePath(); ctx.fill();
+
+  // a Spanish watchtower on the ridge, keeping its useless watch
+  const wx = bx + W*.052, wy = hz - H*.138;
+  ctx.fillStyle = "#cdb98f";
+  ctx.fillRect(wx, wy, W*.012, H*.055);
+  ctx.fillStyle = "#b09a6e";
+  ctx.fillRect(wx, wy, W*.012, H*.012);           // the parapet
+  ctx.fillStyle = "#6b5330";
+  for (let i = 0; i < 3; i++) ctx.fillRect(wx + i*W*.0045, wy - H*.004, W*.002, H*.004);
+  ctx.strokeStyle = "#8a6a3a"; ctx.lineWidth = Math.max(1, H*.0016);
+  ctx.beginPath(); ctx.moveTo(wx+W*.006, wy); ctx.lineTo(wx+W*.006, wy-H*.02); ctx.stroke();
+
+  // cardon cacti along the ridge, the Baja giant
+  ctx.strokeStyle = "#5f7347"; ctx.lineCap = "round";
+  for (let i = 0; i < 9; i++){
+    const f = i/9;
+    const cx2 = bx + W*(.01 + f*.09), cy = hz - H*(.06 + .07*Math.sin(f*7+1));
+    const ch2 = H*(.02 + .015*((i*7)%3));
+    ctx.lineWidth = Math.max(1.4, H*.004);
+    ctx.beginPath(); ctx.moveTo(cx2, cy); ctx.lineTo(cx2, cy - ch2); ctx.stroke();
+    ctx.lineWidth = Math.max(1, H*.003);          // the arms
+    ctx.beginPath();
+    ctx.moveTo(cx2, cy - ch2*.55); ctx.lineTo(cx2 - ch2*.3, cy - ch2*.55);
+    ctx.lineTo(cx2 - ch2*.3, cy - ch2*.85);
+    ctx.moveTo(cx2, cy - ch2*.4); ctx.lineTo(cx2 + ch2*.28, cy - ch2*.4);
+    ctx.lineTo(cx2 + ch2*.28, cy - ch2*.7);
+    ctx.stroke();
+  }
+
+  // the sandy spit curling off the point into the bay
+  ctx.fillStyle = "#f2e4b6";
+  ctx.beginPath();
+  ctx.moveTo(bx, hz);
+  ctx.quadraticCurveTo(bx - W*.04, hz + H*.012, bx - W*.11, hz + H*.004);
+  ctx.quadraticCurveTo(bx - W*.05, hz + H*.028, bx + W*.02, hz + H*.02);
+  ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = "rgba(255,255,255,.7)"; ctx.lineWidth = Math.max(1, H*.0018);
+  ctx.beginPath();
+  ctx.moveTo(bx - W*.11, hz + H*.005);
+  ctx.quadraticCurveTo(bx - W*.05, hz + H*.029, bx + W*.02, hz + H*.021);
+  ctx.stroke();
 }
 
 // ------------------------------------------------------------ the sea
@@ -460,6 +544,7 @@ function battleStep(dt, t){
     const gx = eng ? W*.335 : W*.615, gy = HORIZON() + H*.115;
     const dir = eng ? 1 : -1;
     flashes.push({ x: gx, y: gy - H*.02, t: 0, dir });
+    shoot();
     for (let i = 0; i < 6; i++){
       puffs.push({
         x: gx + dir * (10 + Math.random()*26), y: gy - H*.015 - Math.random()*H*.05,
@@ -538,6 +623,35 @@ function frame(now){
 
   drawBattleFx();
 
+  // a foreground rock, bottom-left, with pelicans and a splash of surf
+  ctx.fillStyle = "#6f5a3c";
+  ctx.beginPath();
+  ctx.moveTo(-10, H);
+  ctx.lineTo(W*.02, H*.84);
+  ctx.lineTo(W*.07, H*.88);
+  ctx.lineTo(W*.11, H*.82);
+  ctx.lineTo(W*.15, H);
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle = "#86log".replace("log","6e46");          // a lit facet
+  ctx.beginPath();
+  ctx.moveTo(W*.02, H*.84); ctx.lineTo(W*.07, H*.88);
+  ctx.lineTo(W*.055, H); ctx.lineTo(-10, H); ctx.closePath(); ctx.fill();
+  ctx.globalAlpha = .6; ctx.fillStyle = "#ffffff";          // surf at its foot
+  for (let i = 0; i < 5; i++){
+    const px = W*(.01 + i*.03), py = H*(.9 + .02*Math.sin(t*2+i));
+    ctx.beginPath(); ctx.ellipse(px, py, W*.02, H*.008, 0, 0, Math.PI*2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  // two brown pelicans perched on it
+  ctx.fillStyle = "#3f3326";
+  for (const [px, py] of [[W*.045, H*.82], [W*.085, H*.845]]){
+    ctx.beginPath(); ctx.ellipse(px, py, W*.011, H*.012, -.2, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(px - W*.009, py - H*.012, W*.004, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = "#3f3326"; ctx.lineWidth = Math.max(1, H*.003);
+    ctx.beginPath(); ctx.moveTo(px - W*.012, py - H*.012);
+    ctx.lineTo(px - W*.022, py - H*.006); ctx.stroke();   // the long bill
+  }
+
   // foreground swell, dark, for depth
   ctx.fillStyle = "rgba(14,70,110,.35)";
   ctx.beginPath();
@@ -563,12 +677,12 @@ addEventListener("keydown", e => {
   if (k === "2") play("desire");
   if (k === "3") play("duke");
   if (k === "4") play("centurion");
-  // the theme starts on the first gesture, if the cue exists
+  startAudio();
+});
+addEventListener("pointerdown", startAudio);
+function startAudio(){
+  audioOn = true;
   const a = document.getElementById("theme");
   if (a && a.paused){ a.volume = .5; a.play().catch(()=>{}); }
-});
-addEventListener("pointerdown", () => {
-  const a = document.getElementById("theme");
-  if (a && a.paused){ a.volume = .5; a.play().catch(()=>{}); }
-});
+}
 </script>

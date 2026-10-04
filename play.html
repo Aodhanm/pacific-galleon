@@ -539,15 +539,18 @@ function prizeStep(dt){
 // so the game owns its audio outright: the sea bed, the guns, shot
 // striking home or falling short, canvas being worked, and the wreck.
 let A = null, sfxGain = null, seaGain = null, seaFilt = null;
-let windGain = null, windFilt = null, cannonBuf = null;
+let windGain = null, windFilt = null, cannonBufs = [];
 function audioInit(){
   if (A) return;
   try { A = new (window.AudioContext || window.webkitAudioContext)(); } catch(e){ return; }
   if (A.state === "suspended") A.resume().catch(()=>{});
   sfxGain = A.createGain(); sfxGain.gain.value = 1; sfxGain.connect(A.destination);
-  // the cannon is KEDR's recorded report (cannon.m4a), one per gun
-  fetch("cannon.m4a").then(r => r.arrayBuffer())
-    .then(b => A.decodeAudioData(b)).then(b => { cannonBuf = b; }).catch(()=>{});
+  // the broadside is HMS VICTORY herself: two cuts of her recorded
+  // rolling broadside, used whole, one per volley
+  for (const f of ["cannon.m4a", "cannon2.m4a"]){
+    fetch(f).then(r => r.arrayBuffer())
+      .then(b => A.decodeAudioData(b)).then(b => { cannonBufs.push(b); }).catch(()=>{});
+  }
   const len = A.sampleRate * 2;
   const buf = A.createBuffer(1, len, A.sampleRate);
   const d = buf.getChannelData(0);
@@ -625,25 +628,25 @@ function tone(type, f0, f1, dur, vol, delay){
   g.gain.exponentialRampToValueAtTime(0.0001, t0+dur);
   o.connect(g); g.connect(sfxGain); o.start(t0); o.stop(t0+dur+.03);
 }
-// A BROADSIDE: KEDR's recorded cannon, one report per gun, each a hand
-// apart and each at its own pitch, over a deep synth boom for body.
-// Falls back to the all-synth gun if the clip has not decoded.
+// A BROADSIDE: a real one. HMS Victory's rolling broadside, recorded,
+// played whole: the guns go off in succession down her side exactly as
+// they do in the game. Two cuts alternate so it never repeats exactly;
+// all-synth guns remain as the fallback while the clips decode.
 function sfxBroadside(nG){
   if (!A) return;
+  if (cannonBufs.length){
+    const s2 = A.createBufferSource();
+    s2.buffer = cannonBufs[(Math.random()*cannonBufs.length)|0];
+    s2.playbackRate.value = .96 + Math.random()*.08;
+    const g = A.createGain(); g.gain.value = .9;
+    s2.connect(g); g.connect(sfxGain); s2.start();
+    return;
+  }
   for (let i = 0; i < nG; i++){
     const dl = i * (.06 + Math.random()*.11);
-    if (cannonBuf){
-      const t0 = A.currentTime + dl;
-      const s2 = A.createBufferSource(); s2.buffer = cannonBuf;
-      s2.playbackRate.value = .88 + Math.random()*.26;
-      const g = A.createGain(); g.gain.value = .75;
-      s2.connect(g); g.connect(sfxGain); s2.start(t0);
-      tone("triangle", 70 + Math.random()*15, 28, .55, .3, dl);
-    } else {
-      tone("triangle", 85 + Math.random()*20, 32, .5, .5, dl);
-      playBuf(noiseBuf(.3, t2 => (1-t2)**2), .4, "lowpass", 620, 0, dl);
-      playBuf(noiseBuf(.06, t2 => (1-t2)**1.2), .22, "bandpass", 2100, 1.2, dl);
-    }
+    tone("triangle", 85 + Math.random()*20, 32, .5, .5, dl);
+    playBuf(noiseBuf(.3, t2 => (1-t2)**2), .4, "lowpass", 620, 0, dl);
+    playBuf(noiseBuf(.06, t2 => (1-t2)**1.2), .22, "bandpass", 2100, 1.2, dl);
   }
 }
 // a chest coming over the rail: the clink, and the thud in the hold

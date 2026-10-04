@@ -53,7 +53,9 @@ addEventListener("resize", resize); resize();
 
 // one cannon report per broadside: a small pool of the Victory single
 // shot, started muted until the first gesture so autoplay is happy
-const rollSnd = ["cannon.m4a","cannon2.m4a"].map(f => { const a = new Audio(f); a.volume = .3; return a; });
+const shotPool = Array.from({length: 3}, () => {
+  const a = new Audio("cannon-one.m4a"); a.volume = .28; return a;
+});
 let shotI = 0, audioOn = false;
 const gullSnd = ["gull1.m4a","gull2.m4a"].map(f => { const a = new Audio(f); a.volume = .6; return a; });
 const splashSnd = Array.from({length: 6}, () => { const a = new Audio("splash.m4a"); a.volume = .35; return a; });
@@ -75,8 +77,8 @@ function gullStep(dt){
 }
 function shoot(){
   if (!audioOn) return;
-  const a = rollSnd[shotI = (shotI+1) % rollSnd.length];
-  try { a.currentTime = 0; a.volume = .3; a.play().catch(()=>{}); } catch(e){}
+  const a = shotPool[shotI = (shotI+1) % shotPool.length];
+  try { a.currentTime = 0; a.volume = .26; a.play().catch(()=>{}); } catch(e){}
 }
 
 const HORIZON = () => H * .52;

@@ -14,7 +14,7 @@ she strikes her colours, lay her aboard. Boarding/treasure/second
 galleon still to come. Music: Rule Britannia (title), Marcha Real
 slow (the sighting), British Grenadiers (the prize).
 
-Files: `index.html` (title: the action off the cape, in profile) ·
+Files: `index.html` (title) · `captains.html` (choose your captain: stylised portraits, flagship, ship stats) ·
 `play.html` (page, loop, HUD, combat, cards) · `ships.js` (classes,
 square-rig physics, drawing) · `cape.js` (Cabo San Lucas, depth,
 weather, the galleon's lane) · `music/` + `tools/` (the three cues and

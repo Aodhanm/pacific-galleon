@@ -755,7 +755,7 @@ requestAnimationFrame(frame);
 
 // ------------------------------------------------------------- input
 function play(ship){
-  location.href = "play.html" + (ship ? "?ship=" + ship : "");
+  location.href = ship ? "play.html?ship=" + ship : "captains.html";
 }
 addEventListener("keydown", e => {
   const k = e.key;

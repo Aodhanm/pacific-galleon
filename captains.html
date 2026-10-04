@@ -1,0 +1,293 @@
+<meta charset="utf-8">
+<title>Pacific Galleon &mdash; choose your captain</title>
+<style>
+  :root{ --display: Trattatello, Luminari, "Academy Engraved LET", serif; }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;min-height:100%;background:#15486a;overflow-x:hidden;
+    font-family:var(--display);color:#eaf1f5;-webkit-font-smoothing:antialiased;
+    background:linear-gradient(#2b6f93 0%, #1d5f86 46%, #134b6c 100%)}
+  h1{text-align:center;font-weight:400;color:#f2f6f9;letter-spacing:.05em;
+    font-size:clamp(26px,3.8vw,52px);margin:clamp(14px,3vh,34px) 0 .1em;
+    text-shadow:0 2px 0 rgba(0,0,0,.2), 0 6px 18px rgba(8,24,36,.4)}
+  .sub{text-align:center;color:#bcd4e2;letter-spacing:.14em;
+    font-size:clamp(11px,1.2vw,15px);margin-bottom:clamp(10px,2vh,24px)}
+  .row{display:flex;gap:clamp(10px,1.6vw,22px);justify-content:center;
+    flex-wrap:wrap;padding:0 16px 20px;max-width:1500px;margin:0 auto}
+  .card{width:clamp(210px,21vw,290px);background:rgba(10,30,44,.42);
+    border:2px solid rgba(180,200,214,.22);border-radius:10px;
+    padding:14px 14px 16px;cursor:pointer;transition:transform .14s ease,
+    border-color .14s ease, background .14s ease, box-shadow .14s ease}
+  .card:hover,.card.sel{transform:translateY(-6px);border-color:#f2a63c;
+    background:rgba(16,42,58,.6);box-shadow:0 10px 30px rgba(8,24,36,.5)}
+  .frame{position:relative;width:100%;aspect-ratio:3/3.4;border-radius:6px;
+    overflow:hidden;background:radial-gradient(120% 120% at 40% 30%, #3a5064, #1a2c3a);
+    border:1px solid rgba(0,0,0,.35)}
+  .frame canvas{position:absolute;inset:0;width:100%;height:100%}
+  .nm{font-size:clamp(17px,1.5vw,23px);color:#f2f6f9;margin:.5em 0 0;text-align:center;
+    letter-spacing:.03em}
+  .yr{text-align:center;color:#f2a63c;font-size:clamp(11px,1vw,14px);letter-spacing:.1em}
+  .ship{text-align:center;color:#bcd4e2;font-size:clamp(12px,1.05vw,15px);
+    font-style:italic;margin:.25em 0 .1em}
+  .blurb{color:#9fb6c4;font-size:clamp(10px,.86vw,12.5px);line-height:1.5;
+    text-align:center;margin:.3em 2px .5em;min-height:3.2em}
+  .stats{margin-top:.2em}
+  .stat{display:flex;align-items:center;gap:7px;font-size:clamp(9px,.8vw,11.5px);
+    color:#bcd4e2;letter-spacing:.04em;line-height:1.9}
+  .stat .lab{width:4.7em;text-align:right;color:#8fa8b8}
+  .bar{flex:1;height:6px;background:rgba(150,170,184,.18);border-radius:3px;overflow:hidden}
+  .bar i{display:block;height:100%;background:linear-gradient(90deg,#c8781f,#f2a63c)}
+  .hint{text-align:center;color:#9fb6c4;font-size:clamp(11px,1vw,14px);
+    letter-spacing:.08em;padding-bottom:26px}
+  .hint b{color:#f2a63c}
+  .go{color:#f2a63c}
+</style>
+
+<h1>Choose your captain</h1>
+<div class="sub">THE ENGLISH RAIDERS OF THE PACIFIC &middot; 1579 &ndash; 1743</div>
+<div class="row" id="row"></div>
+<div class="hint">&larr; &rarr; to choose &nbsp;&middot;&nbsp; <b>Enter</b> or click to sail &nbsp;&middot;&nbsp;
+  <b>Esc</b> back to the title</div>
+
+<script type="module">
+import { CLASSES } from "./ships.js";
+
+// Display data per captain. Portraits are ORIGINAL stylised busts drawn
+// in the game's flat-vector language, evoking each man's era and the look
+// of his known portraits (Elizabethan ruff and pointed beard for Drake
+// and Cavendish; the full periwig of Queen Anne's day for Rogers; the
+// powdered wig and blue naval coat of the 1740s for Anson) rather than
+// copying any image.
+const CAPS = [
+  { key:"goldenhind", name:"DRAKE",     years:"1577 – 80",
+    blurb:"The first Englishman round the world, and the terror of the Pacific. Took the treasure ship Cacafuego off Peru.",
+    look:{ era:"eliz", hair:"#7a4a26", beard:"pointed", skin:"#e8c6a4",
+           coat:"#3a2a46", trim:"#d9a441", ruff:true, hat:"flatcap", hatCol:"#241733" } },
+  { key:"desire",     name:"CAVENDISH", years:"1586 – 88",
+    blurb:"Youngest to circumnavigate. Off this very cape, 1587, he battered the Santa Ana until she struck.",
+    look:{ era:"eliz", hair:"#2a1e14", beard:"pointed", skin:"#e8c6a4",
+           coat:"#5a1f27", trim:"#d9a441", ruff:true, hat:"none" } },
+  { key:"duke",       name:"WOODES ROGERS", years:"1708 – 11",
+    blurb:"Bristol privateer who rescued Alexander Selkirk and took a Manila galleon off California with the Duke and Dutchess.",
+    look:{ era:"geo1", hair:"#6a4a2c", beard:"none", skin:"#e6c09a",
+           coat:"#6b3a22", trim:"#caa25a", cravat:true } },
+  { key:"centurion",  name:"ANSON",     years:"1740 – 44",
+    blurb:"Circled the globe and took the Covadonga in a fierce gun-duel. His real enemy was scurvy, not Spain.",
+    look:{ era:"geo2", hair:"#e8e6dc", beard:"none", skin:"#e6c09a",
+           coat:"#1f3560", trim:"#d9bc58", cravat:true, facings:"#f0ece0" } },
+];
+
+// stats, 1..5, derived in spirit from the physics in ships.js
+const STATS = {
+  goldenhind: { Speed:5, Handling:5, Broadside:2, Hull:2, Hold:2 },
+  desire:     { Speed:4, Handling:4, Broadside:3, Hull:3, Hold:3 },
+  duke:       { Speed:3, Handling:3, Broadside:4, Hull:4, Hold:4 },
+  centurion:  { Speed:3, Handling:2, Broadside:5, Hull:5, Hold:5 },
+};
+
+// ----------------------------------------------------- the portraits
+function portrait(cv, L){
+  const ctx = cv.getContext("2d");
+  const W = cv.width = 300, H = cv.height = 340;
+  const cx = W/2;
+  ctx.clearRect(0,0,W,H);
+
+  // soft studio background already on the frame; add a vignette
+  const vg = ctx.createRadialGradient(cx, H*.34, 20, cx, H*.4, H*.7);
+  vg.addColorStop(0, "rgba(255,245,225,.10)"); vg.addColorStop(1, "rgba(6,16,24,.35)");
+  ctx.fillStyle = vg; ctx.fillRect(0,0,W,H);
+
+  // ---- the coat / shoulders
+  ctx.fillStyle = L.coat;
+  ctx.beginPath();
+  ctx.moveTo(cx-120, H);
+  ctx.quadraticCurveTo(cx-120, H*.74, cx-66, H*.66);
+  ctx.quadraticCurveTo(cx, H*.6, cx+66, H*.66);
+  ctx.quadraticCurveTo(cx+120, H*.74, cx+120, H);
+  ctx.closePath(); ctx.fill();
+  // coat shading
+  ctx.fillStyle = "rgba(0,0,0,.18)";
+  ctx.beginPath();
+  ctx.moveTo(cx+30, H); ctx.quadraticCurveTo(cx+70, H*.72, cx+120, H*.78);
+  ctx.lineTo(cx+120, H); ctx.closePath(); ctx.fill();
+
+  if (L.era === "geo2" && L.facings){
+    // naval lapels and gold trim
+    ctx.fillStyle = L.facings;
+    ctx.beginPath();
+    ctx.moveTo(cx-54, H*.72); ctx.lineTo(cx-18, H*.68);
+    ctx.lineTo(cx-30, H); ctx.lineTo(cx-66, H); ctx.closePath(); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(cx+54, H*.72); ctx.lineTo(cx+18, H*.68);
+    ctx.lineTo(cx+30, H); ctx.lineTo(cx+66, H); ctx.closePath(); ctx.fill();
+  }
+  // gold trim line along the collar/coat edge
+  ctx.strokeStyle = L.trim; ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(cx-64, H*.67); ctx.quadraticCurveTo(cx, H*.61, cx+64, H*.67);
+  ctx.stroke();
+
+  // ---- the neckwear
+  if (L.ruff){
+    // a great Elizabethan cartwheel ruff, drawn as a lobed white disc
+    ctx.save();
+    ctx.translate(cx, H*.6);
+    for (let pass = 0; pass < 2; pass++){
+      ctx.fillStyle = pass ? "#ffffff" : "rgba(210,220,228,.9)";
+      ctx.beginPath();
+      const rr = pass ? 60 : 66;
+      for (let i = 0; i <= 28; i++){
+        const a = i/28 * Math.PI*2;
+        const lobe = 1 + .12*Math.sin(a*14);
+        const x = Math.cos(a)*rr*lobe, y = Math.sin(a)*rr*.42*lobe;
+        i ? ctx.lineTo(x,y) : ctx.moveTo(x,y);
+      }
+      ctx.closePath(); ctx.fill();
+    }
+    // the folds
+    ctx.strokeStyle = "rgba(150,164,176,.5)"; ctx.lineWidth = 1;
+    for (let i = 0; i < 28; i++){
+      const a = i/28 * Math.PI*2;
+      ctx.beginPath(); ctx.moveTo(Math.cos(a)*18, Math.sin(a)*8);
+      ctx.lineTo(Math.cos(a)*64, Math.sin(a)*27); ctx.stroke();
+    }
+    ctx.restore();
+  } else if (L.cravat){
+    // a white stock/cravat at the throat
+    ctx.fillStyle = "#f2efe6";
+    ctx.beginPath();
+    ctx.moveTo(cx-20, H*.62); ctx.quadraticCurveTo(cx, H*.6, cx+20, H*.62);
+    ctx.lineTo(cx+14, H*.76); ctx.quadraticCurveTo(cx, H*.82, cx-14, H*.76);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = "rgba(160,168,176,.5)"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(cx, H*.63); ctx.lineTo(cx, H*.8); ctx.stroke();
+  }
+
+  // ---- neck
+  ctx.fillStyle = shade(L.skin, -14);
+  ctx.fillRect(cx-16, H*.5, 32, H*.12);
+
+  // ---- the head
+  const faceY = H*.37, faceR = 52;
+  ctx.fillStyle = L.skin;
+  ctx.beginPath();
+  ctx.ellipse(cx, faceY, faceR*.84, faceR, 0, 0, Math.PI*2); ctx.fill();
+  // a little side shadow for form
+  ctx.fillStyle = "rgba(0,0,0,.10)";
+  ctx.beginPath();
+  ctx.ellipse(cx+18, faceY+4, faceR*.5, faceR*.86, 0, -Math.PI*.4, Math.PI*.6); ctx.fill();
+
+  // brow, eyes, nose, mouth
+  ctx.fillStyle = "#2a1e16";
+  ctx.beginPath(); ctx.ellipse(cx-18, faceY-6, 5, 3.2, 0, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(cx+18, faceY-6, 5, 3.2, 0, 0, Math.PI*2); ctx.fill();
+  ctx.strokeStyle = shade(L.skin,-40); ctx.lineWidth = 2; ctx.lineCap="round";
+  ctx.beginPath(); ctx.moveTo(cx-2, faceY-2); ctx.lineTo(cx-5, faceY+12);
+  ctx.lineTo(cx+2, faceY+14); ctx.stroke();           // nose
+  // eyebrows
+  ctx.strokeStyle = shade(L.hair,-10); ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(cx-26, faceY-16); ctx.lineTo(cx-10, faceY-18);
+  ctx.moveTo(cx+10, faceY-18); ctx.lineTo(cx+26, faceY-16); ctx.stroke();
+
+  // ---- hair / wig, drawn behind is approximated by drawing over the crown
+  if (L.era === "geo2"){
+    // powdered wig: rolls of white at the sides, swept back
+    ctx.fillStyle = L.hair;
+    ctx.beginPath(); ctx.ellipse(cx, faceY-26, faceR*.92, faceR*.7, 0, Math.PI, 0); ctx.fill();
+    for (const sx of [-1,1]){
+      ctx.beginPath();
+      ctx.ellipse(cx+sx*faceR*.78, faceY+6, 15, 22, 0, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(cx+sx*faceR*.74, faceY+30, 12, 15, 0, 0, Math.PI*2); ctx.fill();
+    }
+  } else if (L.era === "geo1"){
+    // full periwig: long dark curls down past the shoulders
+    ctx.fillStyle = L.hair;
+    ctx.beginPath(); ctx.ellipse(cx, faceY-24, faceR*1.02, faceR*.78, 0, Math.PI, 0); ctx.fill();
+    for (const sx of [-1,1]){
+      for (let k = 0; k < 3; k++){
+        ctx.beginPath();
+        ctx.ellipse(cx+sx*(faceR*.8+k*2), faceY+2+k*20, 16-k*2, 20, 0, 0, Math.PI*2);
+        ctx.fill();
+      }
+    }
+    // curls' highlight
+    ctx.fillStyle = shade(L.hair, 18);
+    for (const sx of [-1,1]) for (let k=0;k<3;k++){
+      ctx.beginPath(); ctx.arc(cx+sx*(faceR*.8+k*2)-4, faceY-4+k*20, 4, 0, Math.PI*2); ctx.fill();
+    }
+  } else {
+    // Elizabethan: short swept hair, and a cap if any
+    ctx.fillStyle = L.hair;
+    ctx.beginPath(); ctx.ellipse(cx, faceY-30, faceR*.9, faceR*.64, 0, Math.PI, 0); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(cx-faceR*.78, faceY-14, 10, 18, 0, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(cx+faceR*.78, faceY-14, 10, 18, 0, 0, Math.PI*2); ctx.fill();
+    if (L.hat === "flatcap"){
+      ctx.fillStyle = L.hatCol;
+      ctx.beginPath();
+      ctx.ellipse(cx, faceY-44, faceR*.98, 20, 0, Math.PI, 0); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(cx, faceY-44, faceR*1.05, 9, 0, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = L.trim;                 // a jewel/feather mount
+      ctx.beginPath(); ctx.arc(cx+faceR*.6, faceY-50, 4, 0, Math.PI*2); ctx.fill();
+    }
+  }
+
+  // ---- beard / moustache
+  if (L.beard === "pointed"){
+    ctx.fillStyle = L.hair;
+    // moustache
+    ctx.beginPath();
+    ctx.moveTo(cx-16, faceY+20);
+    ctx.quadraticCurveTo(cx, faceY+16, cx+16, faceY+20);
+    ctx.quadraticCurveTo(cx, faceY+24, cx-16, faceY+20); ctx.fill();
+    // the pointed beard
+    ctx.beginPath();
+    ctx.moveTo(cx-20, faceY+26);
+    ctx.quadraticCurveTo(cx-14, faceY+44, cx, faceY+58);
+    ctx.quadraticCurveTo(cx+14, faceY+44, cx+20, faceY+26);
+    ctx.quadraticCurveTo(cx, faceY+34, cx-20, faceY+26);
+    ctx.fill();
+  }
+}
+function shade(hex, d){
+  const n = parseInt(hex.slice(1),16);
+  let r=(n>>16)+d, g=((n>>8)&255)+d, b=(n&255)+d;
+  r=Math.max(0,Math.min(255,r)); g=Math.max(0,Math.min(255,g)); b=Math.max(0,Math.min(255,b));
+  return "#"+((r<<16)|(g<<8)|b).toString(16).padStart(6,"0");
+}
+
+// ----------------------------------------------------- build the cards
+const row = document.getElementById("row");
+let sel = 0;
+CAPS.forEach((c, i) => {
+  const cls = CLASSES[c.key];
+  const st = STATS[c.key];
+  const card = document.createElement("div");
+  card.className = "card" + (i===0 ? " sel" : "");
+  card.innerHTML = `
+    <div class="frame"><canvas></canvas></div>
+    <div class="nm">${c.name}</div>
+    <div class="yr">${c.years}</div>
+    <div class="ship">H.M.S. <b>${cls.name}</b></div>
+    <div class="blurb">${c.blurb}</div>
+    <div class="stats">${Object.entries(st).map(([k,v]) =>
+      `<div class="stat"><span class="lab">${k}</span>
+        <span class="bar"><i style="width:${v/5*100}%"></i></span></div>`).join("")}</div>`;
+  card.addEventListener("click", () => { sel = i; mark(); launch(); });
+  card.addEventListener("mouseenter", () => { sel = i; mark(); });
+  row.appendChild(card);
+  portrait(card.querySelector("canvas"), c.look);
+});
+function mark(){
+  [...row.children].forEach((el,i) => el.classList.toggle("sel", i===sel));
+}
+function launch(){ location.href = "play.html?ship=" + CAPS[sel].key; }
+
+addEventListener("keydown", e => {
+  if (e.key === "ArrowRight"){ sel = (sel+1) % CAPS.length; mark(); }
+  else if (e.key === "ArrowLeft"){ sel = (sel-1+CAPS.length) % CAPS.length; mark(); }
+  else if (e.key === "Enter"){ launch(); }
+  else if (e.key === "Escape"){ location.href = "index.html"; }
+  else if (/^[1-4]$/.test(e.key)){ sel = +e.key - 1; mark(); launch(); }
+});
+</script>

@@ -1,0 +1,458 @@
+<meta charset="utf-8">
+<title>Pacific Galleon &mdash; the chase</title>
+<style>
+  :root{
+    --bg:#0b1016; --amber:#f2a63c; --dim:#8b97a3; --green:#7fd6a2;
+    --display: Trattatello, Luminari, "Academy Engraved LET", serif;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:#dfe6ec;overflow:hidden;
+    font-family:var(--display);-webkit-font-smoothing:antialiased}
+  #stage{position:absolute;inset:0}
+  canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+  .tl{position:absolute;left:clamp(14px,2.4vw,34px);top:clamp(12px,2vw,26px);pointer-events:none}
+  .tr{position:absolute;right:clamp(14px,2.4vw,34px);top:clamp(12px,2vw,26px);text-align:right;pointer-events:none}
+  .bl{position:absolute;left:clamp(14px,2.4vw,34px);bottom:clamp(12px,2vw,26px);pointer-events:none}
+  .br{position:absolute;right:clamp(14px,2.4vw,34px);bottom:clamp(12px,2vw,26px);text-align:right;pointer-events:none}
+  .k{font-size:clamp(10px,.82vw,13px);letter-spacing:.1em;color:var(--dim);line-height:1.85}
+  .k b{color:#e7eef4;font-weight:400}
+  .k .a{color:var(--amber)}
+  .k .g{color:var(--green)}
+  .k .r{color:#e2705a}
+  .phase{font-size:clamp(15px,1.5vw,22px);color:var(--amber);letter-spacing:.06em}
+  .order{font-size:clamp(12px,1.05vw,16px);color:#cfd8e0;max-width:34ch;line-height:1.5;
+    text-shadow:0 1px 3px rgba(11,16,22,.9)}
+  #card{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    background:rgba(7,10,15,.82);transition:opacity .5s ease;z-index:5}
+  #card.gone{opacity:0;pointer-events:none}
+  .cardin{max-width:min(720px,84vw);padding:0 10px}
+  .cardin h1{font-size:clamp(30px,4.6vw,66px);margin:0 0 .3em;font-weight:400;color:#f2f6f9}
+  .cardin p{font-size:clamp(12px,1.12vw,17px);line-height:1.62;color:#c7d1da;margin:.5em 0}
+  .cardin .src{font-size:clamp(10px,.86vw,13px);color:var(--dim);line-height:1.7;margin-top:1.1em}
+  .cardin .go{margin-top:1.3em;color:var(--amber);font-size:clamp(12px,1.1vw,16px)}
+  .bar{height:3px;background:rgba(140,155,170,.22);margin-top:6px;width:190px;display:inline-block}
+  .bar i{display:block;height:100%;background:var(--amber)}
+</style>
+
+<div id="stage">
+  <canvas id="sea"></canvas>
+  <div class="tl">
+    <div class="phase" id="phase"></div>
+    <div class="order k" id="order"></div>
+  </div>
+  <div class="tr k" id="nav"></div>
+  <div class="bl k" id="sail"></div>
+  <div class="br k" id="chase"></div>
+  <div id="card"><div class="cardin" id="cardin"></div></div>
+</div>
+
+<script type="module">
+// =====================================================================
+// PACIFIC GALLEON, the open-water scaffold: one English ship, one
+// galleon running the coast, and the chase. No land, no guns, no
+// boarding yet; this page exists to prove the square rig sails right
+// and the chase is winnable and worth winning. The build order is in
+// PLAN.md. Engine lifted from doghole (~/doghole/) by design.
+// =====================================================================
+import * as SEA from "./sea.js";
+import { CLASSES, makeShip, step, drawShip, degOf, norm } from "./ships.js";
+
+const KN = SEA.KN;
+const cv = document.getElementById("sea");
+const ctx = cv.getContext("2d", { alpha:false });
+let W=0, H=0, DPR=1;
+function resize(){
+  DPR = Math.min(devicePixelRatio||1, 2);
+  W = Math.max(320, innerWidth); H = Math.max(240, innerHeight);
+  cv.width = W*DPR; cv.height = H*DPR;
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+}
+addEventListener("resize", resize); resize();
+
+const C = {
+  foam:"#cfdae2",
+};
+
+// ------------------------------------------------------------- state
+// ?ship=goldenhind|desire|duke|centurion picks your command
+const params = new URLSearchParams(location.search);
+const shipKey = CLASSES[params.get("ship")] ? params.get("ship") : "goldenhind";
+
+let env, ship, prize, phase, elapsed, caught;
+function reset(){
+  env = SEA.makeWeather();
+  // You lie hove-to south of her track with bare steerage way on. She
+  // comes down from the north-west, running the coast for the cape.
+  ship = makeShip(shipKey, 0, 0, 100);
+  ship.canvas = .12;
+  prize = makeShip("galleon", -620, -520, 135);
+  prize.canvas = 1;
+  prize.rigDamage = 0;
+  phase = "brief"; elapsed = 0; caught = false;
+}
+reset();
+
+// ------------------------------------------------------------- camera
+const cam = { x: 0, y: 0, span: 760 };
+const T = {
+  X: x => (x - cam.x) * T.k + W/2,
+  Y: y => (y - cam.y) * T.k + H/2,
+  S: v => v * T.k,
+  k: 1,
+};
+function camUpdate(dt){
+  // wide while she is still a sail on the horizon, closing in as you do
+  const d = Math.hypot(prize.x-ship.x, prize.y-ship.y);
+  const want = Math.max(420, Math.min(900, d * 1.15 + 260));
+  cam.span += (want - cam.span) * Math.min(1, dt*.8);
+  const lead = 1.5;
+  // the camera leans toward the prize so you are sailing AT something
+  const bias = Math.min(.32, 180/Math.max(180, d));
+  const tx = ship.x + ship.vx*lead + (prize.x-ship.x)*bias;
+  const ty = ship.y + ship.vy*lead + (prize.y-ship.y)*bias;
+  cam.x += (tx - cam.x) * Math.min(1, dt*3.0);
+  cam.y += (ty - cam.y) * Math.min(1, dt*3.0);
+  T.k = W / Math.max(60, cam.span);
+}
+
+// -------------------------------------------------- sea, swell, flecks
+function drawSwell(t){
+  const a = (env.swellDir + 90) * Math.PI/180;
+  const ux = Math.cos(a), uy = Math.sin(a);
+  const px = -uy, py = ux;
+  const gap = 52, len = Math.max(W, H) * 1.6 / T.k;
+  const ph = (t * 22) % gap;
+  ctx.save();
+  ctx.strokeStyle = "rgba(180,202,220,.06)";
+  ctx.lineWidth = Math.max(1, T.S(2.2));
+  const n = Math.ceil(Math.max(W,H)/T.k/gap) + 3;
+  for (let i = -n; i < n; i++){
+    const base = Math.round((cam.x*px + cam.y*py) / gap) * gap;
+    const d = base + i*gap + ph;
+    const bx = px*d, by = py*d;
+    const wob = Math.sin(t*.7 + i)*4;
+    ctx.beginPath();
+    ctx.moveTo(T.X(bx - ux*len + px*wob), T.Y(by - uy*len + py*wob));
+    ctx.lineTo(T.X(bx + ux*len + px*wob), T.Y(by + uy*len + py*wob));
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+function drawFlecks(t){
+  const cell = 26;
+  const halfW = W/2/T.k, halfH = H/2/T.k;
+  const i0 = Math.floor((cam.x-halfW)/cell), i1 = Math.ceil((cam.x+halfW)/cell);
+  const j0 = Math.floor((cam.y-halfH)/cell), j1 = Math.ceil((cam.y+halfH)/cell);
+  if ((i1-i0)*(j1-j0) > 4200) return;
+  ctx.fillStyle = "#c8dae8";
+  for (let j=j0;j<=j1;j++){
+    for (let i=i0;i<=i1;i++){
+      const h = (((i*73856093) ^ (j*19349663)) >>> 0);
+      const fx = i*cell + (h % 997)/997*cell;
+      const fy = j*cell + ((h>>10) % 991)/991*cell;
+      const ph = (h % 628)/100;
+      ctx.globalAlpha = .04 + .14*Math.max(0, Math.sin(t*1.1 + ph)) * (.5 + env.swell*2);
+      ctx.fillRect(T.X(fx), T.Y(fy), Math.max(1.2,T.S(2.6)), Math.max(1,T.S(.9)));
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+
+// wakes, left in the water where each of them actually was
+function makeWakeOf(s){ return { s, pts: [], t: 0 }; }
+const wakes = [];
+function wakeStep(w, dt){
+  w.t -= dt;
+  if (w.t <= 0 && w.s.speedKn > .7){
+    w.t = .09;
+    w.pts.push({ x: w.s.x + (Math.random()-.5)*4, y: w.s.y + (Math.random()-.5)*4,
+                 a: Math.min(1, w.s.speedKn/5), r: .9 + Math.random()*1.5 });
+    if (w.pts.length > 110) w.pts.shift();
+  }
+  for (const p of w.pts){
+    p.a -= dt*.42;
+    p.x += env.curX * dt; p.y += env.curY * dt;
+  }
+  while (w.pts.length && w.pts[0].a <= 0) w.pts.shift();
+}
+function drawWakes(){
+  for (const w of wakes) for (const p of w.pts){
+    const age = 1 - Math.max(0, p.a);
+    const r = (p.r || 1.2) * (1 + age * 2.4);
+    ctx.globalAlpha = Math.max(0, p.a) * .20;
+    ctx.fillStyle = "#0c161d";
+    ctx.beginPath();
+    ctx.ellipse(T.X(p.x), T.Y(p.y), T.S(r), T.S(r*.72), 0, 0, Math.PI*2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ------------------------------------------------------------- the rose
+function drawRose(){
+  const R = Math.min(96, W*.075), cx = W - R - 34, cy = 200 + R;
+  ctx.save();
+  ctx.globalAlpha = .8;
+  ctx.strokeStyle = "rgba(170,186,200,.55)"; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI*2); ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx, cy, R*.62, 0, Math.PI*2); ctx.stroke();
+  for (let i=0;i<16;i++){
+    const a = i*Math.PI/8 - Math.PI/2;
+    const r0 = i%4 ? R*.9 : R*.78;
+    ctx.beginPath();
+    ctx.moveTo(cx+Math.cos(a)*r0, cy+Math.sin(a)*r0);
+    ctx.lineTo(cx+Math.cos(a)*R, cy+Math.sin(a)*R);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = .75;
+  ctx.fillStyle = "#8b97a3";
+  ctx.font = "10px " + getComputedStyle(document.body).fontFamily;
+  ctx.textAlign = "center";
+  ctx.fillText("N", cx, cy - R - 6);
+  ctx.globalAlpha = 1;
+  const arrow = (dirDeg, len, col, wid) => {
+    const a = (dirDeg - 90) * Math.PI/180;
+    const ex = cx + Math.cos(a)*len, ey = cy + Math.sin(a)*len;
+    ctx.strokeStyle = col; ctx.lineWidth = wid;
+    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(ex, ey); ctx.stroke();
+    ctx.save(); ctx.translate(ex, ey); ctx.rotate(a);
+    ctx.fillStyle = col;
+    ctx.beginPath(); ctx.moveTo(8,0); ctx.lineTo(-5,4); ctx.lineTo(-5,-4);
+    ctx.closePath(); ctx.fill(); ctx.restore();
+  };
+  arrow(((env.windNow ?? env.windFrom) + 180) % 360, R*.82, "rgba(226,236,244,.75)", 2);
+  const setDir = (Math.atan2(env.curX, -env.curY)*180/Math.PI + 360) % 360;
+  arrow(setDir, R*.56, "rgba(242,166,60,.9)", 2.4);
+  arrow(degOf(ship.hdg), R*.4, "rgba(127,214,162,.9)", 2);
+  ctx.save();
+  ctx.globalAlpha = .6; ctx.fillStyle = "#8b97a3";
+  ctx.font = "10px " + getComputedStyle(document.body).fontFamily;
+  ctx.textAlign = "right";
+  ctx.fillText("wind", cx + R, cy + R + 14);
+  ctx.fillStyle = "#f2a63c"; ctx.fillText("current", cx + R, cy + R + 27);
+  ctx.fillStyle = "#7fd6a2"; ctx.fillText("her head", cx + R, cy + R + 40);
+  ctx.restore();
+  ctx.restore();
+}
+
+// an edge mark when the prize is off the screen: "a sail"
+function drawSailMark(){
+  const sx = T.X(prize.x), sy = T.Y(prize.y);
+  if (sx > 40 && sx < W-40 && sy > 40 && sy < H-40) return;
+  const cx = W/2, cy = H/2;
+  const a = Math.atan2(sy-cy, sx-cx);
+  const r = Math.min(W,H)*.42;
+  const px = cx + Math.cos(a)*r, py = cy + Math.sin(a)*r;
+  ctx.save();
+  ctx.translate(px, py); ctx.rotate(a);
+  ctx.globalAlpha = .55; ctx.fillStyle = "#f2a63c";
+  ctx.beginPath(); ctx.moveTo(13,0); ctx.lineTo(-8,6); ctx.lineTo(-8,-6);
+  ctx.closePath(); ctx.fill();
+  ctx.restore();
+  ctx.globalAlpha = .5; ctx.fillStyle = "#f2a63c";
+  ctx.font = "13px " + getComputedStyle(document.body).fontFamily;
+  ctx.textAlign = "center";
+  ctx.fillText("a sail", px - Math.cos(a)*28, py - Math.sin(a)*28 + 4);
+  ctx.globalAlpha = 1;
+}
+
+function drawVignette(){
+  const g = ctx.createRadialGradient(W/2,H*.52,Math.min(W,H)*.28,W/2,H*.52,Math.max(W,H)*.82);
+  g.addColorStop(0,"rgba(11,16,22,0)"); g.addColorStop(1,"rgba(7,10,15,.58)");
+  ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+}
+
+// --------------------------------------------------------------- AI
+// For now she only does what a deep-laden galleon with a sleepy
+// lookout would do: hold her course for the cape. Sighting you, making
+// more sail, yawing to fire: all later, per PLAN.md.
+function prizeStep(dt){
+  const want = 135 * Math.PI/180;
+  const off = norm(want - prize.hdg);
+  prize.helm = Math.max(-1, Math.min(1, off * 2.5));
+  prize.canvas = 1;
+}
+
+// ------------------------------------------------------------- cards
+const el = id => document.getElementById(id);
+function card(html){ el("cardin").innerHTML = html; el("card").classList.remove("gone"); }
+function hideCard(){ el("card").classList.add("gone"); }
+
+const cls = CLASSES[shipKey];
+card(`<h1>Pacific Galleon</h1>
+  <p><b>Off Cabo San Lucas.</b> You command ${cls.captain}'s <i>${cls.name}</i>,
+  lying hove-to south of the track with bare steerage way on. The Manila galleon
+  is coming down the coast out of the north-west, running for the cape and
+  Acapulco, with the wind and the current astern of her.</p>
+  <p>Overhaul her and lay her aboard. She is slower than you everywhere,
+  but she is running in her best point of sail, and so must you.</p>
+  <p class="src">
+  &larr; &rarr; helm &nbsp;&middot;&nbsp; &uarr; make sail &nbsp;&middot;&nbsp; &darr; take in sail<br>
+  A square rig will not lie within about five points of the wind, and is
+  fastest with the wind on the quarter. Your rudder only bites with way on.<br>
+  OPEN-WATER SCAFFOLD: no land, no guns, no boarding yet. ?ship=goldenhind,
+  desire, duke or centurion picks your command.</p>
+  <div class="go">Enter to make sail</div>`);
+
+function winCard(){
+  caught = true; phase = "over";
+  card(`<h1>Laid aboard</h1>
+    <p>You ran her down in <b>${Math.floor(elapsed/60)}m ${Math.floor(elapsed%60)}s</b>
+    and your grapnels are in her rail. The boarding, the battle before it and the
+    treasure after it are the next things this game grows.</p>
+    <p class="src">Cavendish off this cape, 1587, took the <i>Santa Ana</i> after a
+    six-hour fight. Rogers, 1709, took the <i>Encarnaci&oacute;n</i> here. Both prizes
+    were slower than their takers, and both ran for it first.</p>
+    <div class="go">Enter to sail it again</div>`);
+}
+function loseCard(){
+  phase = "over";
+  card(`<h1>She has run clear</h1>
+    <p>The galleon has stretched away out of reach and will round the cape for
+    Acapulco. A stern chase is a long chase, and she had too much of a start.</p>
+    <div class="go">Enter to lie in wait again</div>`);
+}
+
+// ------------------------------------------------------------- input
+const keys = {};
+addEventListener("keydown", e => {
+  const k = e.key.toLowerCase();
+  keys[k] = true;
+  if (k === "enter"){
+    if (phase === "brief"){ hideCard(); phase = "chase"; }
+    else if (phase === "over"){ reset(); hideCard(); phase = "chase"; }
+  }
+  if (k === "escape") location.reload();
+});
+addEventListener("keyup", e => { keys[e.key.toLowerCase()] = false; });
+
+// --------------------------------------------------------------- HUD
+function pts(deg){
+  const n = ["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW"];
+  return n[Math.round(((deg%360)+360)%360/22.5)%16];
+}
+function pointOfSail(s){
+  const a = Math.abs(s.awa) * 180/Math.PI;
+  if (s.inIrons) return '<span class="r">In irons: helm over and bear away</span>';
+  if (a < s.cls.polar.irons + 12) return "Close-hauled, as near as she will lie";
+  if (a < 100) return "A beam reach";
+  if (a < 155) return '<span class="g">The wind on her quarter: her best point</span>';
+  return "Running square";
+}
+let closure = 0, lastD = null;
+function hud(){
+  const d = Math.hypot(prize.x-ship.x, prize.y-ship.y);
+  const brg = degOf(Math.atan2(prize.x-ship.x, -(prize.y-ship.y)));
+  el("nav").innerHTML = `
+    <div>Head <b>${pts(degOf(ship.hdg))} ${degOf(ship.hdg).toFixed(0)}&deg;</b></div>
+    <div>Speed <b>${ship.speedKn.toFixed(1)} kn</b></div>
+    <div>Wind <b>${pts(env.windNow ?? env.windFrom)} ${(env.windKnNow ?? env.windKn).toFixed(0)} kn</b></div>
+    <div>Current sets <b>${pts(degOf(Math.atan2(env.curX,-env.curY)))}</b> ${(Math.hypot(env.curX,env.curY)/KN).toFixed(2)} kn</div>`;
+  el("sail").innerHTML = `
+    <div>Canvas <b>${(ship.canvas*100).toFixed(0)}%</b> <span class="bar"><i style="width:${ship.canvas*100}%"></i></span></div>
+    <div>${pointOfSail(ship)}</div>`;
+  el("chase").innerHTML = phase === "chase" ? `
+    <div>The chase <b>${pts(brg)}</b>, <b>${d < 1000 ? Math.round(d) + " yd" : (d/SEA.YD_PER_NM).toFixed(1) + " nm"}</b></div>
+    <div>${closure > .05 ? `<span class="g">Closing, ${closure.toFixed(1)} kn</span>`
+         : closure < -.05 ? `<span class="r">She is stretching away, ${(-closure).toFixed(1)} kn</span>`
+         : "Holding her own"}</div>
+    <div>Her speed <b>${prize.speedKn.toFixed(1)} kn</b></div>` : "";
+  el("phase").textContent = phase === "chase" ? "The chase" : "";
+  el("order").textContent = phase === "chase"
+    ? "Run her down before she rounds the cape. Keep the wind on your quarter and point your bowsprit where she will be, not where she is."
+    : "";
+}
+
+// -------------------------------------------------------------- loop
+wakes.push(makeWakeOf(ship), makeWakeOf(prize));
+let last = performance.now();
+function frame(now){
+  const dt = Math.min((now-last)/1000, .05); last = now;
+  const live = phase === "chase";
+  try {
+    if (live){
+      elapsed += dt;
+      SEA.weatherStep(env, dt);
+      ship.helm = (keys["arrowleft"]?-1:0) + (keys["arrowright"]?1:0);
+      if (keys["arrowup"]) ship.canvas = Math.min(1, ship.canvas + dt*1.3);
+      if (keys["arrowdown"]) ship.canvas = Math.max(0, ship.canvas - dt*1.3);
+      prizeStep(dt);
+      // doghole's time compression: seven sim ticks a frame, true knots
+      for (let i=0;i<7;i++){ step(ship, env, dt); step(prize, env, dt); }
+      for (const w of wakes) wakeStep(w, dt);
+      const d = Math.hypot(prize.x-ship.x, prize.y-ship.y);
+      if (lastD != null){
+        const inst = ((lastD - d) / dt / 7) / KN;
+        // a teleport (dev hooks) or a hitch makes an absurd instant rate;
+        // the readout ignores anything no ship could do
+        if (Math.abs(inst) < 40) closure += (inst - closure) * Math.min(1, dt*2);
+      }
+      lastD = d;
+      if (d < 45) winCard();
+      else if (d > 3200) loseCard();
+    }
+  } catch (err) {
+    window.__simErr = window.__simErr || [];
+    if (window.__simErr.length < 12) window.__simErr.push(String(err));
+  }
+  camUpdate(dt);
+
+  ctx.fillStyle = "#15242f"; ctx.fillRect(0,0,W,H);   // blue water, deep
+  drawSwell(env.t);
+  drawFlecks(env.t);
+  drawWakes();
+  drawShip(ctx, T, prize, env.t, C);
+  drawShip(ctx, T, ship, env.t, C);
+  if (phase === "chase"){ drawSailMark(); drawRose(); }
+  drawVignette();
+  try { hud(); } catch (err) {
+    window.__hudErr = window.__hudErr || [];
+    if (window.__hudErr.length < 12) window.__hudErr.push(String(err));
+  }
+  requestAnimationFrame(frame);
+}
+
+// dev hooks, as in doghole
+window.__dev = {
+  get ship(){ return ship; },
+  get prize(){ return prize; },
+  get env(){ return env; },
+  get phase(){ return phase; },
+  put(x, y, hdgDeg, cv2 = 0){
+    ship.x = x; ship.y = y; ship.hdg = (hdgDeg||0)*Math.PI/180;
+    ship.vx = 0; ship.vy = 0; ship.omega = 0; ship.canvas = cv2;
+  },
+  wind(fromDeg, kn){ env.windFrom = fromDeg; env.windKn = kn; },
+  close(){
+    ship.x = prize.x - 120; ship.y = prize.y + 60; ship.hdg = prize.hdg;
+    lastD = null; this.snap();
+  },
+  snap(){ cam.x = ship.x; cam.y = ship.y; },
+  // pump the simulation by hand, for testing in a throttled tab where
+  // requestAnimationFrame barely fires. n sixtieths of a second.
+  tick(n = 600){
+    const h = 1/60;
+    for (let i = 0; i < n; i++){
+      elapsed += h;
+      SEA.weatherStep(env, h);
+      prizeStep(h);
+      // __dev.auto = a heading in degrees steers her through the pump
+      if (this.auto != null){
+        const off = norm(this.auto * Math.PI/180 - ship.hdg);
+        ship.helm = Math.max(-1, Math.min(1, off * 2.5));
+      }
+      for (let k = 0; k < 7; k++){ step(ship, env, h); step(prize, env, h); }
+      for (const w of wakes) wakeStep(w, h);
+      camUpdate(h);
+      const d = Math.hypot(prize.x-ship.x, prize.y-ship.y);
+      lastD = d;
+      if (phase === "chase" && d < 45){ winCard(); break; }
+    }
+    return { d: Math.hypot(prize.x-ship.x, prize.y-ship.y),
+             shipKn: ship.speedKn, prizeKn: prize.speedKn, phase };
+  },
+};
+
+requestAnimationFrame(frame);
+</script>

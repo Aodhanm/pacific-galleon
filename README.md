@@ -8,13 +8,17 @@ galleon off Cabo San Lucas. Top-down sailing in the doghole engine
     open http://127.0.0.1:8914/play.html           # the open-water chase scaffold
     open "http://127.0.0.1:8914/play.html?ship=duke"   # or desire, centurion
 
-Design and build order: `PLAN.md`. Status: **open-water scaffold** only.
-One English ship, one galleon running the coast, the chase, a boarding
-card when you lay her alongside. No land, guns, grapple or boarding yet.
+Design and build order: `PLAN.md`. Status: **daytime Cabo build**:
+the cape and bay, the ambush, the chase, manual broadsides (SPACE),
+she strikes her colours, lay her aboard. Boarding/treasure/second
+galleon still to come. Music: Rule Britannia (title), Marcha Real
+slow (the sighting), British Grenadiers (the prize).
 
-Files: `play.html` (page, loop, HUD, cards) · `ships.js` (classes,
-square-rig physics, drawing) · `sea.js` (water, weather; becomes
-`cape.js` work when the Cabo shore goes in).
+Files: `index.html` (title: the action off the cape, in profile) ·
+`play.html` (page, loop, HUD, combat, cards) · `ships.js` (classes,
+square-rig physics, drawing) · `cape.js` (Cabo San Lucas, depth,
+weather, the galleon's lane) · `music/` + `tools/` (the three cues and
+the pipeline that renders them).
 
 Dev hooks in the console: `__dev.put(x,y,hdg)`, `__dev.wind(from,kn)`,
 `__dev.close()` drops you 120 yards astern of the prize.

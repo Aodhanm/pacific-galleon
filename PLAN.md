@@ -155,6 +155,30 @@ Cruising Voyage Round the World* (1712), Walter/Robins' *Anson's Voyage*
 (1748), Schurz *The Manila Galleon* (1939). Rogers and the Anson account
 are on IA; check the vault bibliography DB first.
 
+## Music (built 2026-10-03)
+
+Three cues, rendered through the passion-organ storm-organ synth
+(`tools/render_organ.py`, a parameterized fork of
+`~/passion-organ/scripts/render_midi.py`):
+- **Rule, Britannia!** (Arne, 1740) at 80 bpm: the title theme
+  (`theme-britannia.m4a`).
+- **The British Grenadiers** (traditional): the victory cue
+  (`grenadiers.m4a`).
+- **Marcha Real / Marcha Granadera** (anonymous, in print by 1761) at
+  58 bpm, HOLD 1.5, SWELL .6: slow and in the old style; rises when
+  the galleon is sighted (`marcha-real.m4a`).
+
+Licensing is CLEAN by construction: the compositions are public
+domain, and the shipped MIDI arrangements are our own
+(`tools/make_tunes.py` extracts only the melody line from reference
+encodings downloaded from mfiles.co.uk and flutetunes.com, then writes
+its own harmony and bass; no third-party encoding ships). ⚠ Aodhan
+should AUDITION all three: the melody lines came from the references,
+but the harmonization is algorithmic (I-ii-IV-V-vi by melody fit) and
+a wrong chord is possible. ⚠ Anachronism, flagged: the Marcha
+Granadera postdates Drake and Cavendish by nearly two centuries; it is
+game music, not a period claim.
+
 ## Build order
 
 1. Repo scaffold: copy doghole's `play.html`/`vessel.js`/`serve_nocache.py`

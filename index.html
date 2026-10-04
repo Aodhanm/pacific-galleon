@@ -1,0 +1,574 @@
+<meta charset="utf-8">
+<title>Pacific Galleon</title>
+<style>
+  :root{ --display: Trattatello, Luminari, "Academy Engraved LET", serif; }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:#7ec4e4;overflow:hidden;font-family:var(--display);
+    -webkit-font-smoothing:antialiased}
+  canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+  .plate{position:absolute;inset:0;pointer-events:none;display:flex;
+    flex-direction:column;align-items:center}
+  h1{font-size:clamp(44px,7.5vw,110px);margin:7vh 0 0;font-weight:400;color:#1d3a4e;
+    letter-spacing:.04em;text-shadow:0 2px 0 rgba(255,255,255,.35), 0 6px 18px rgba(20,50,70,.25)}
+  .sub{font-size:clamp(13px,1.4vw,19px);color:#2c4d61;letter-spacing:.14em;margin-top:.6em;
+    text-shadow:0 1px 2px rgba(255,255,255,.5)}
+  .menu{position:absolute;bottom:7vh;text-align:center}
+  .go{font-size:clamp(15px,1.6vw,22px);color:#8a4a0e;letter-spacing:.1em;
+    text-shadow:0 1px 2px rgba(255,255,255,.55);animation:pulse 2.2s ease-in-out infinite}
+  .caps{font-size:clamp(11px,1vw,14px);color:#2c4d61;letter-spacing:.1em;margin-top:.9em;
+    text-shadow:0 1px 2px rgba(255,255,255,.5)}
+  .caps b{color:#143040;font-weight:400}
+  @keyframes pulse{0%,100%{opacity:.55}50%{opacity:1}}
+</style>
+
+<canvas id="scene"></canvas>
+<div class="plate">
+  <h1>Pacific Galleon</h1>
+  <div class="sub">THE MANILA SHIP, OFF CABO SAN LUCAS &middot; 1579 &ndash; 1743</div>
+  <div class="menu">
+    <div class="go">Enter &mdash; lie in wait</div>
+    <div class="caps"><b>1</b> Drake &middot; <b>2</b> Cavendish &middot; <b>3</b> Rogers &middot; <b>4</b> Anson</div>
+  </div>
+</div>
+<audio id="theme" src="theme-britannia.m4a" loop preload="auto"></audio>
+
+<script>
+// =====================================================================
+// The title: an action off the cape, in profile, by day. One English
+// private ship with St George's cross at her mastheads trading
+// broadsides with a Spanish galleon under the Cross of Burgundy, the
+// arch of Cabo San Lucas behind them. Everything drawn in the page.
+// =====================================================================
+const cv = document.getElementById("scene");
+const ctx = cv.getContext("2d", { alpha:false });
+let W=0, H=0;
+function resize(){
+  const d = Math.min(devicePixelRatio||1, 2);
+  W = innerWidth; H = innerHeight;
+  cv.width = W*d; cv.height = H*d;
+  ctx.setTransform(d,0,0,d,0,0);
+}
+addEventListener("resize", resize); resize();
+
+const HORIZON = () => H * .52;
+
+// ----------------------------------------------------------- the sky
+function drawSky(t){
+  const hz = HORIZON();
+  const g = ctx.createLinearGradient(0, 0, 0, hz);
+  g.addColorStop(0, "#5fb5e2");
+  g.addColorStop(.62, "#9fd4ea");
+  g.addColorStop(1, "#f2e3bc");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, hz);
+
+  // the sun, high to the south-west, with its glare
+  const sx = W * .22, sy = H * .16;
+  const halo = ctx.createRadialGradient(sx, sy, 0, sx, sy, H*.3);
+  halo.addColorStop(0, "rgba(255,250,225,.95)");
+  halo.addColorStop(.18, "rgba(255,244,200,.55)");
+  halo.addColorStop(1, "rgba(255,244,200,0)");
+  ctx.fillStyle = halo;
+  ctx.fillRect(sx-H*.3, sy-H*.3, H*.6, H*.6);
+  ctx.fillStyle = "#fffbe8";
+  ctx.beginPath(); ctx.arc(sx, sy, H*.035, 0, Math.PI*2); ctx.fill();
+
+  // flat fair-weather clouds, drifting
+  ctx.fillStyle = "rgba(255,255,255,.85)";
+  const clouds = [
+    [.55, .14, .16, 1], [.78, .10, .11, .8], [.38, .24, .10, .7],
+    [.9, .3, .13, .75], [.12, .34, .09, .6], [.65, .3, .08, .55],
+  ];
+  for (const [fx, fy, fw, al] of clouds){
+    const x = ((fx + t*.0022) % 1.2 - .1) * W, y = fy*H, w = fw*W;
+    ctx.globalAlpha = al * .8;
+    ctx.beginPath();
+    ctx.ellipse(x, y, w, w*.16, 0, 0, Math.PI*2);
+    ctx.ellipse(x - w*.4, y + w*.05, w*.5, w*.11, 0, 0, Math.PI*2);
+    ctx.ellipse(x + w*.45, y + w*.04, w*.55, w*.12, 0, 0, Math.PI*2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ------------------------------------------- the cape and the arch
+function drawCape(t){
+  const hz = HORIZON();
+  // far mainland, hazy
+  ctx.fillStyle = "#c9b393";
+  ctx.globalAlpha = .5;
+  ctx.beginPath();
+  ctx.moveTo(W*.55, hz);
+  ctx.lineTo(W*.62, hz - H*.035);
+  ctx.lineTo(W*.72, hz - H*.05);
+  ctx.lineTo(W*.84, hz - H*.03);
+  ctx.lineTo(W*.9, hz - H*.045);
+  ctx.lineTo(W*1.02, hz - H*.02);
+  ctx.lineTo(W*1.02, hz);
+  ctx.closePath(); ctx.fill();
+  ctx.globalAlpha = 1;
+
+  // Land's End: the granite ridge coming down into the sea, right of frame
+  const bx = W * .86;
+  ctx.fillStyle = "#b29877";
+  ctx.beginPath();
+  ctx.moveTo(W*1.02, hz);
+  ctx.lineTo(W*1.02, hz - H*.16);
+  ctx.lineTo(bx + W*.1, hz - H*.14);
+  ctx.lineTo(bx + W*.055, hz - H*.075);
+  ctx.lineTo(bx + W*.028, hz - H*.085);
+  ctx.lineTo(bx + W*.012, hz - H*.045);
+  ctx.lineTo(bx, hz);
+  ctx.closePath(); ctx.fill();
+  // lit faces
+  ctx.fillStyle = "#cdb38d";
+  ctx.beginPath();
+  ctx.moveTo(bx + W*.028, hz - H*.085);
+  ctx.lineTo(bx + W*.055, hz - H*.075);
+  ctx.lineTo(bx + W*.045, hz);
+  ctx.lineTo(bx + W*.012, hz);
+  ctx.closePath(); ctx.fill();
+
+  // THE ARCH, standing free off the point
+  const ax = bx - W*.045, aw = W*.034, ah = H*.085;
+  ctx.fillStyle = "#b29877";
+  ctx.beginPath();
+  ctx.moveTo(ax - aw*.5, hz);
+  ctx.bezierCurveTo(ax - aw*.52, hz - ah*.9, ax - aw*.15, hz - ah, ax, hz - ah*.92);
+  ctx.bezierCurveTo(ax + aw*.3, hz - ah*.85, ax + aw*.52, hz - ah*.5, ax + aw*.55, hz);
+  ctx.closePath(); ctx.fill();
+  // the window through it
+  ctx.fillStyle = "#8fd2e2";
+  ctx.beginPath();
+  ctx.moveTo(ax - aw*.13, hz);
+  ctx.bezierCurveTo(ax - aw*.15, hz - ah*.5, ax + aw*.1, hz - ah*.52, ax + aw*.17, hz - ah*.3);
+  ctx.bezierCurveTo(ax + aw*.2, hz - ah*.15, ax + aw*.22, hz, ax + aw*.2, hz);
+  ctx.closePath(); ctx.fill();
+  // a sunlit edge on the arch
+  ctx.strokeStyle = "rgba(240,224,190,.8)";
+  ctx.lineWidth = Math.max(1, H*.004);
+  ctx.beginPath();
+  ctx.moveTo(ax - aw*.45, hz - ah*.35);
+  ctx.bezierCurveTo(ax - aw*.4, hz - ah*.8, ax - aw*.1, hz - ah*.94, ax + aw*.05, hz - ah*.88);
+  ctx.stroke();
+  // the outer friar rock
+  ctx.fillStyle = "#a8906f";
+  ctx.beginPath();
+  ctx.moveTo(ax - aw*1.5, hz);
+  ctx.lineTo(ax - aw*1.25, hz - ah*.42);
+  ctx.lineTo(ax - aw*.95, hz);
+  ctx.closePath(); ctx.fill();
+}
+
+// ------------------------------------------------------------ the sea
+function drawSea(t){
+  const hz = HORIZON();
+  const g = ctx.createLinearGradient(0, hz, 0, H);
+  g.addColorStop(0, "#49b4cf");
+  g.addColorStop(.3, "#2f9ac4");
+  g.addColorStop(1, "#176b9e");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, hz, W, H - hz);
+
+  // the sun's glitter lane
+  ctx.save();
+  const sx = W * .22;
+  for (let i = 0; i < 70; i++){
+    const f = i / 70;
+    const y = hz + f*f * (H - hz) * .9 + 2;
+    const spread = 20 + f * W * .1;
+    const n = 2 + Math.floor(f*4);
+    for (let k = 0; k < n; k++){
+      const ph = Math.sin(t*1.6 + i*1.7 + k*2.9);
+      if (ph < .1) continue;
+      const x = sx + Math.sin(i*12.9898 + k*78.233) * spread;
+      ctx.globalAlpha = ph * (.5 - f*.3);
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(x, y, Math.max(2, 10*f + ph*4), Math.max(1, 2.4*f));
+    }
+  }
+  ctx.restore();
+  ctx.globalAlpha = 1;
+
+  // long low swells, rolling through
+  ctx.strokeStyle = "rgba(255,255,255,.14)";
+  for (let i = 0; i < 14; i++){
+    const f = i / 14;
+    const y0 = hz + 8 + f*f * (H - hz) * .96;
+    ctx.lineWidth = 1 + f * 2.2;
+    ctx.beginPath();
+    for (let x = -20; x <= W+20; x += 24){
+      const y = y0 + Math.sin(x*.008 + t*(.6+f) + i*2) * (1.5 + f*5);
+      x === -20 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+}
+
+// ------------------------------------------------------- a ship, side on
+// Parametric profile painter. kind: "english" or "galleon".
+// x,y = waterline midpoint on screen; s = scale (hull length px);
+// face = 1 drawn bow to the right, -1 bow to the left.
+function drawProfileShip(kind, x, y, s, face, t, ph){
+  const gal = kind === "galleon";
+  const bob = Math.sin(t*.9 + ph) * s*.012;
+  const roll = Math.sin(t*.7 + ph*2) * .015;
+  ctx.save();
+  ctx.translate(x, y + bob);
+  ctx.scale(face, 1);
+  ctx.rotate(roll);
+
+  const L = s;                       // hull length on screen
+  const hullH = s * (gal ? .16 : .12);     // freeboard
+  const sheer = s * (gal ? .09 : .055);    // how the ends rise
+
+  // reflection first, under everything
+  ctx.save();
+  ctx.scale(1, -1);
+  ctx.globalAlpha = .14;
+  ctx.fillStyle = gal ? "#4a2e16" : "#331f10";
+  ctx.fillRect(-L*.48, -hullH*.1, L*.95, hullH*.9);
+  ctx.restore();
+
+  // ---- hull, dark below the wale, warm above
+  const deckY = -hullH;
+  ctx.fillStyle = gal ? "#4f3016" : "#3b2512";
+  ctx.beginPath();
+  ctx.moveTo(-L*.5, deckY + sheer*.2);             // stern rail
+  ctx.quadraticCurveTo(-L*.52, hullH*.25, -L*.42, hullH*.32);  // sternpost
+  ctx.lineTo(L*.4, hullH*.34);                     // keel run
+  ctx.quadraticCurveTo(L*.52, hullH*.2, L*.5, deckY + sheer*(gal ? .5 : .35)); // stem
+  ctx.lineTo(L*.44, deckY - sheer*.15);
+  ctx.lineTo(-L*.44, deckY - sheer*.05);
+  ctx.closePath(); ctx.fill();
+
+  // the wale: a pale strake along her whole side
+  ctx.strokeStyle = gal ? "#c89858" : "#a87f46";
+  ctx.lineWidth = Math.max(1.5, s*.012);
+  ctx.beginPath();
+  ctx.moveTo(-L*.48, deckY + hullH*.42);
+  ctx.quadraticCurveTo(0, deckY + hullH*.56, L*.47, deckY + hullH*.3);
+  ctx.stroke();
+
+  // gunports, a black row along the wale
+  const nP = gal ? 7 : 6;
+  ctx.fillStyle = "#17100a";
+  for (let i = 0; i < nP; i++){
+    const f = -.36 + i * (.72 / (nP-1));
+    const py = deckY + hullH*.46 + f*f * hullH*.1;
+    ctx.fillRect(L*f - s*.013, py, s*.026, s*.022);
+  }
+
+  // ---- castles
+  ctx.fillStyle = gal ? "#8a4f26" : "#6b4a24";
+  if (gal){
+    // the towering sterncastle, two steps
+    ctx.fillRect(-L*.5, deckY - s*.1, L*.17, s*.1);
+    ctx.fillRect(-L*.5, deckY - s*.17, L*.1, s*.07);
+    // forecastle
+    ctx.fillRect(L*.3, deckY - s*.055, L*.14, s*.055);
+    // gilding lines on the stern
+    ctx.strokeStyle = "#e3b54a"; ctx.lineWidth = Math.max(1, s*.006);
+    ctx.beginPath();
+    ctx.moveTo(-L*.5, deckY - s*.1); ctx.lineTo(-L*.33, deckY - s*.1);
+    ctx.moveTo(-L*.5, deckY - s*.035); ctx.lineTo(-L*.33, deckY - s*.035);
+    ctx.moveTo(-L*.5, deckY - s*.17); ctx.lineTo(-L*.4, deckY - s*.17);
+    ctx.stroke();
+    // stern lantern
+    ctx.fillStyle = "#e3b54a";
+    ctx.beginPath(); ctx.arc(-L*.515, deckY - s*.19, s*.012, 0, Math.PI*2); ctx.fill();
+    // the gallery: two rows of lit windows across the sterncastle
+    ctx.fillStyle = "#f3d27c";
+    for (let r2 = 0; r2 < 2; r2++){
+      for (let wnd = 0; wnd < 4 - r2; wnd++){
+        ctx.fillRect(-L*.485 + wnd*L*.036, deckY - s*.085 - r2*s*.062,
+                     s*.018, s*.026);
+      }
+    }
+    // an ochre band the length of her upper works
+    ctx.fillStyle = "rgba(170,90,40,.55)";
+    ctx.fillRect(-L*.44, deckY - sheer*.02, L*.86, hullH*.2);
+  } else {
+    // race-built: low castles, a clean sheer
+    ctx.fillRect(-L*.48, deckY - s*.05, L*.15, s*.05);
+    ctx.fillRect(L*.3, deckY - s*.035, L*.12, s*.035);
+  }
+
+  // the beakhead under the bowsprit
+  ctx.fillStyle = gal ? "#8a4f26" : "#6b4a24";
+  ctx.beginPath();
+  ctx.moveTo(L*.5, deckY + sheer*.4);
+  ctx.quadraticCurveTo(L*.6, deckY + sheer*.3, L*.62, deckY - sheer*.1);
+  ctx.lineTo(L*.5, deckY - sheer*.05);
+  ctx.closePath(); ctx.fill();
+
+  // ---- masts, sails, rigging
+  const mastX = gal ? [-L*.31, L*.02, L*.3] : [-L*.3, L*.04, L*.32];
+  const mastH = gal ? [s*.42, s*.56, s*.4] : [s*.4, s*.52, s*.38];
+  const windLean = .06;                           // canvas bellies to the left
+  for (let m = 0; m < 3; m++){
+    const mx = mastX[m], mh = mastH[m], top = deckY - mh;
+    ctx.strokeStyle = "#241a0c";
+    ctx.lineWidth = Math.max(2, s*.016);
+    ctx.beginPath();
+    ctx.moveTo(mx, deckY + s*.01); ctx.lineTo(mx + mh*windLean*.4, top);
+    ctx.stroke();
+    // the pole above the highest canvas, and a long pennant off it
+    ctx.lineWidth = Math.max(1, s*.008);
+    ctx.beginPath();
+    ctx.moveTo(mx + mh*windLean*.4, top); ctx.lineTo(mx + mh*windLean*.5, top - mh*.09);
+    ctx.stroke();
+    ctx.strokeStyle = gal ? "#b3362a" : "#c03a2a";
+    ctx.lineWidth = Math.max(1.2, s*.009);
+    ctx.beginPath();
+    const pn = top - mh*.07;
+    ctx.moveTo(mx + mh*windLean*.5, pn);
+    ctx.quadraticCurveTo(mx - s*.07, pn + Math.sin(t*4+m)*s*.012,
+                         mx - s*.13, pn + s*.01 + Math.sin(t*4+m+1)*s*.015);
+    ctx.stroke();
+
+    const mizzen = m === 0;
+    if (mizzen){
+      // the lateen, a long yard slung fore-and-aft: in profile a tall
+      // triangle abaft the mast
+      ctx.strokeStyle = "#2e2110"; ctx.lineWidth = Math.max(1.2, s*.009);
+      ctx.beginPath();
+      ctx.moveTo(mx - L*.17, deckY - mh*.3);
+      ctx.lineTo(mx + L*.09, deckY - mh*1.02);
+      ctx.stroke();
+      ctx.fillStyle = "rgba(242,233,210,.96)";
+      ctx.beginPath();
+      ctx.moveTo(mx - L*.16, deckY - mh*.32);
+      ctx.lineTo(mx + L*.075, deckY - mh*.98);
+      ctx.quadraticCurveTo(mx + L*.02, deckY - mh*.4, mx - L*.02, deckY - mh*.18);
+      ctx.closePath(); ctx.fill();
+      continue;
+    }
+    // square sails up the mast: course near the deck, topsail above,
+    // a topgallant on the main. Spans in fractions of the mast height.
+    const SPANS = m === 1
+      ? [[.07, .44, 1], [.5, .78, .78], [.82, .98, .55]]
+      : [[.08, .48, 1], [.55, .92, .72]];
+    for (let k2 = 0; k2 < SPANS.length; k2++){
+      const [fB, fT, wf] = SPANS[k2];
+      const wTop = wf * (m === 1 ? L*.3 : L*.24) * .88;
+      const wBot = wf * (m === 1 ? L*.3 : L*.24) * 1.08;
+      const yT = deckY - mh * fT;
+      const yB = deckY - mh * fB;
+      const belly = s * .03 * (1 + k2*.2);
+      // the yard
+      ctx.strokeStyle = "#2e2110"; ctx.lineWidth = Math.max(1.2, s*.009);
+      ctx.beginPath();
+      ctx.moveTo(mx - wTop, yT); ctx.lineTo(mx + wTop, yT);
+      ctx.stroke();
+      // the cloth, drawing, lit from the left
+      const grad = ctx.createLinearGradient(mx - wBot, 0, mx + wBot, 0);
+      grad.addColorStop(0, "#fdf8ea");
+      grad.addColorStop(.55, "#efe5cb");
+      grad.addColorStop(1, "#d9cba8");
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.moveTo(mx - wTop, yT);
+      ctx.quadraticCurveTo(mx - wBot - belly, (yT+yB)/2, mx - wBot*.92, yB);
+      ctx.quadraticCurveTo(mx - belly*.4, yB + belly*.7, mx + wBot*.92, yB);
+      ctx.quadraticCurveTo(mx + wBot + belly*.2, (yT+yB)/2, mx + wTop, yT);
+      ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = "rgba(120,100,70,.4)";
+      ctx.lineWidth = Math.max(.8, s*.004);
+      ctx.stroke();
+    }
+    // shrouds
+    ctx.strokeStyle = "rgba(40,28,14,.5)";
+    ctx.lineWidth = Math.max(.6, s*.003);
+    for (const dxr of [-.055, -.04, .04, .055]){
+      ctx.beginPath();
+      ctx.moveTo(mx + L*dxr*1.4, deckY);
+      ctx.lineTo(mx + mh*windLean*.35, top + mh*.12);
+      ctx.stroke();
+    }
+    // the flag at the masthead
+    const fw2 = s*.085, fh = s*.038;
+    const rip = Math.sin(t*6 + m*2 + ph) * fh*.25;
+    const fx2 = mx + mh*windLean*.4;
+    ctx.save();
+    ctx.translate(fx2, top);
+    if (gal){
+      ctx.fillStyle = "#f3ecda";
+      flagShape(fw2, fh, rip);
+      ctx.strokeStyle = "#b3362a"; ctx.lineWidth = Math.max(1, s*.007);
+      ctx.beginPath();
+      ctx.moveTo(-fw2*.92, -fh*.32 + rip*.4); ctx.lineTo(-fw2*.1, fh*.34);
+      ctx.moveTo(-fw2*.92, fh*.36 + rip*.4);  ctx.lineTo(-fw2*.1, -fh*.3);
+      ctx.stroke();
+    } else {
+      ctx.fillStyle = "#f6f2e8";
+      flagShape(fw2, fh, rip);
+      ctx.strokeStyle = "#c03a2a"; ctx.lineWidth = Math.max(1, s*.008);
+      ctx.beginPath();
+      ctx.moveTo(-fw2*.95, rip*.4); ctx.lineTo(-fw2*.05, rip*.1);
+      ctx.moveTo(-fw2*.55, -fh*.42 + rip*.3); ctx.lineTo(-fw2*.55, fh*.44 + rip*.3);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // the sea working at her: a curl at the stem, a wake streak astern
+  ctx.fillStyle = "rgba(255,255,255,.75)";
+  ctx.beginPath();
+  const bw = Math.sin(t*2.2 + ph) * s*.006;
+  ctx.ellipse(L*.5, hullH*.3 + bw, s*.05, s*.016, -.3, 0, Math.PI*2);
+  ctx.fill();
+  ctx.globalAlpha = .4;
+  ctx.beginPath();
+  ctx.ellipse(-L*.55, hullH*.32, s*.09, s*.012, 0, 0, Math.PI*2);
+  ctx.fill();
+  ctx.globalAlpha = 1;
+
+  // bowsprit, with its own small sail
+  ctx.strokeStyle = "#2e2110"; ctx.lineWidth = Math.max(1.5, s*.011);
+  ctx.beginPath();
+  ctx.moveTo(L*.47, deckY - sheer*.1);
+  ctx.lineTo(L*.68, deckY - s*.1);
+  ctx.stroke();
+  ctx.fillStyle = "rgba(242,233,210,.9)";
+  ctx.beginPath();
+  ctx.moveTo(L*.52, deckY - sheer*.05);
+  ctx.quadraticCurveTo(L*.58, deckY + s*.03, L*.66, deckY - s*.075);
+  ctx.closePath(); ctx.fill();
+
+  ctx.restore();
+}
+function flagShape(fw2, fh, rip){
+  ctx.beginPath();
+  ctx.moveTo(0, -fh*.5);
+  ctx.quadraticCurveTo(-fw2*.5, -fh*.5 + rip, -fw2, -fh*.42 + rip*.6);
+  ctx.lineTo(-fw2*.94, fh*.52 + rip*.6);
+  ctx.quadraticCurveTo(-fw2*.4, fh*.5 + rip, 0, fh*.5);
+  ctx.closePath(); ctx.fill();
+}
+
+// ------------------------------------------------- the gunnery between them
+let puffs = [], flashes = [], splash2 = [];
+let nextBroadside = 1.6;
+function battleStep(dt, t){
+  nextBroadside -= dt;
+  if (nextBroadside <= 0){
+    // they take turns
+    const eng = Math.random() < .55;
+    nextBroadside = 2.8 + Math.random()*3;
+    const gx = eng ? W*.335 : W*.615, gy = HORIZON() + H*.115;
+    const dir = eng ? 1 : -1;
+    flashes.push({ x: gx, y: gy - H*.02, t: 0, dir });
+    for (let i = 0; i < 6; i++){
+      puffs.push({
+        x: gx + dir * (10 + Math.random()*26), y: gy - H*.015 - Math.random()*H*.05,
+        r: 6 + Math.random()*10, a: .95,
+        vx: dir * (26 + Math.random()*20), vy: -7 - Math.random()*9,
+      });
+    }
+    // splashes short of the other hull
+    const n = 1 + (Math.random()*2|0);
+    for (let i = 0; i < n; i++){
+      splash2.push({ x: W*.475 + (Math.random()-.5)*W*.1, y: gy + H*.02 + Math.random()*H*.03,
+                     t: -(.3 + Math.random()*.4) });
+    }
+  }
+  for (const p of puffs){
+    p.x += p.vx*dt; p.y += p.vy*dt;
+    p.vx *= 1 - dt*.7; p.vy *= 1 - dt*.4;
+    p.x += dt * 14;                              // the wind carries it all east
+    p.r += dt*26; p.a -= dt*.34;
+  }
+  puffs = puffs.filter(p => p.a > 0);
+  for (const f of flashes) f.t += dt;
+  flashes = flashes.filter(f => f.t < .14);
+  for (const sp of splash2) sp.t += dt;
+  splash2 = splash2.filter(sp => sp.t < 1);
+}
+function drawBattleFx(){
+  for (const f of flashes){
+    ctx.globalAlpha = 1 - f.t/.14;
+    ctx.fillStyle = "#ffdf8a";
+    ctx.beginPath();
+    ctx.ellipse(f.x + f.dir*14, f.y, 26, 9, 0, 0, Math.PI*2);
+    ctx.fill();
+  }
+  for (const sp of splash2){
+    if (sp.t < 0) continue;
+    const f = sp.t;
+    ctx.globalAlpha = (1-f) * .85;
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath();
+    ctx.ellipse(sp.x, sp.y - f*H*.025*(1-f)*3, H*.004 + f*H*.004, H*.02*(1-f*.4), 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(sp.x, sp.y, H*.012 + f*H*.02, H*.005, 0, 0, Math.PI*2);
+    ctx.fill();
+  }
+  for (const p of puffs){
+    ctx.globalAlpha = Math.max(0, p.a) * .9;
+    const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r);
+    g.addColorStop(0, "#ffffff");
+    g.addColorStop(.7, "#eceae2");
+    g.addColorStop(1, "rgba(236,234,226,0)");
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI*2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+// -------------------------------------------------------------- loop
+let last = performance.now(), T0 = last;
+function frame(now){
+  const dt = Math.min((now-last)/1000, .05); last = now;
+  const t = (now - T0)/1000;
+  const hz = HORIZON();
+
+  drawSky(t);
+  drawCape(t);
+  drawSea(t);
+
+  battleStep(dt, t);
+
+  // the two of them, broadside to broadside off the cape:
+  // the Englishman to windward on the left, the galleon to leeward
+  drawProfileShip("english", W*.33, hz + H*.138, Math.min(W*.21, H*.42), 1, t, 0);
+  drawProfileShip("galleon", W*.645, hz + H*.148, Math.min(W*.27, H*.54), -1, t, 2.2);
+
+  drawBattleFx();
+
+  // foreground swell, dark, for depth
+  ctx.fillStyle = "rgba(14,70,110,.35)";
+  ctx.beginPath();
+  ctx.moveTo(0, H);
+  for (let x = 0; x <= W+30; x += 30){
+    ctx.lineTo(x, H - H*.05 + Math.sin(x*.01 + t*.8)*H*.012);
+  }
+  ctx.lineTo(W, H);
+  ctx.closePath(); ctx.fill();
+
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+// ------------------------------------------------------------- input
+function play(ship){
+  location.href = "play.html" + (ship ? "?ship=" + ship : "");
+}
+addEventListener("keydown", e => {
+  const k = e.key;
+  if (k === "Enter") play(null);
+  if (k === "1") play("goldenhind");
+  if (k === "2") play("desire");
+  if (k === "3") play("duke");
+  if (k === "4") play("centurion");
+  // the theme starts on the first gesture, if the cue exists
+  const a = document.getElementById("theme");
+  if (a && a.paused){ a.volume = .5; a.play().catch(()=>{}); }
+});
+addEventListener("pointerdown", () => {
+  const a = document.getElementById("theme");
+  if (a && a.paused){ a.volume = .5; a.play().catch(()=>{}); }
+});
+</script>

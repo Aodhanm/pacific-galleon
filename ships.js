@@ -17,7 +17,7 @@
 // the record; VERIFY the ship particulars before any sources table
 // ships (see PLAN.md).
 // =====================================================================
-import { KN, depthAt, windShadow } from "./sea.js";
+import { KN, depthAt, windShadow } from "./cape.js";
 
 export const norm = a => {
   while (a > Math.PI) a -= Math.PI * 2;
@@ -31,6 +31,10 @@ export const degOf = r => ((r * 180 / Math.PI) % 360 + 360) % 360;
 // mass0 the ponderousness, cap the treasure she can stow (in chests).
 // polar: irons = closest she will lie (degrees off the wind), then the
 // curve's anchors at the beam, her best point, and dead run.
+// Colours are daylight wood: wale = the hull sides you see around the
+// deck, deck = the planking, castle = the raised works. flag picks her
+// colours: St George's cross for the English, the Cross of Burgundy
+// for Spain, which is what Spanish ships wore at sea in all four eras.
 export const CLASSES = {
   goldenhind: {
     name: "Golden Hind", captain: "Drake", year: 1579,
@@ -38,7 +42,8 @@ export const CLASSES = {
     sail: 1.55, kFwd: .057, kLat: 1.05, rud: .118, yawDamp: .95,
     mass0: 1.0, loadK: 1.05, draft0: 6, cap: 30,
     polar: { irons: 55, beam: .82, bestA: 135, best: 1, run: .86 },
-    hull: "#10161e", trim: "#2a2118",
+    wale: "#452f18", deck: "#c29d66", castle: "#8a6434", castleHi: "#9f7840",
+    accent: "#d9a441", flag: "english",
   },
   desire: {
     name: "Desire", captain: "Cavendish", year: 1587,
@@ -46,7 +51,8 @@ export const CLASSES = {
     sail: 1.52, kFwd: .058, kLat: 1.05, rud: .105, yawDamp: .95,
     mass0: 1.1, loadK: 1.05, draft0: 6.5, cap: 36,
     polar: { irons: 56, beam: .8, bestA: 136, best: 1, run: .87 },
-    hull: "#111820", trim: "#2a2118",
+    wale: "#3f2c18", deck: "#bb9763", castle: "#80602f", castleHi: "#94713a",
+    accent: "#c69a3e", flag: "english",
   },
   duke: {
     name: "Duke", captain: "Woodes Rogers", year: 1709,
@@ -54,7 +60,8 @@ export const CLASSES = {
     sail: 1.62, kFwd: .066, kLat: 1.1, rud: .085, yawDamp: 1.0,
     mass0: 1.6, loadK: .9, draft0: 8, cap: 50,
     polar: { irons: 58, beam: .78, bestA: 138, best: 1, run: .88 },
-    hull: "#121a22", trim: "#2a2118",
+    wale: "#38281a", deck: "#b4905c", castle: "#776033", castleHi: "#8a7140",
+    accent: "#b98f3a", flag: "english",
   },
   centurion: {
     name: "Centurion", captain: "Anson", year: 1743,
@@ -62,7 +69,8 @@ export const CLASSES = {
     sail: 1.78, kFwd: .079, kLat: 1.2, rud: .06, yawDamp: 1.15,
     mass0: 2.4, loadK: .75, draft0: 10.5, cap: 70,
     polar: { irons: 60, beam: .76, bestA: 140, best: 1, run: .9 },
-    hull: "#131b23", trim: "#2a2118",
+    wale: "#33271c", deck: "#ad8c5e", castle: "#6f5c36", castleHi: "#827044",
+    accent: "#c9a23f", flag: "english",
   },
   // the prize. The variants (unarmed and fat, the normal prize, the one
   // you do not touch) come later as overrides on this base; see the
@@ -77,7 +85,8 @@ export const CLASSES = {
     sail: 1.5, kFwd: .095, kLat: 1.15, rud: .05, yawDamp: 1.2,
     mass0: 2.6, loadK: .4, draft0: 11, cap: 0,
     polar: { irons: 70, beam: .62, bestA: 150, best: 1, run: .95 },
-    hull: "#201712", trim: "#3a2c1d",
+    wale: "#54371d", deck: "#c6a26c", castle: "#9c582c", castleHi: "#b26a36",
+    accent: "#e3b54a", flag: "burgundy",
   },
 };
 
@@ -89,7 +98,7 @@ export function makeShip(clsKey, x, y, hdgDeg) {
     hdg: hdgDeg * Math.PI / 180,     // 0 = north, clockwise
     vx: 0, vy: 0, omega: 0,
     helm: 0, canvas: .5,
-    cargo: 0, damage: 0,
+    cargo: 0, damage: 0, rigDamage: 0, struck: false,
     // kept for the grapple, which is doghole's warp code with a moving
     // target; unused until the boarding phase goes in
     warp: null, lines: 0, moored: false,
@@ -126,7 +135,7 @@ export function step(s, env, dt) {
   const fwd = wx * fx + wy * fy;
   const lat = wx * sx + wy * sy;
 
-  // wind (sea.js breathes it; fall back to the base if it has not)
+  // wind (cape.js breathes it; fall back to the base if it has not)
   const windFrom = env.windNow ?? env.windFrom;
   const windKn = env.windKnNow ?? env.windKn;
   const shade = windShadow(s.x, s.y, windFrom);
@@ -198,57 +207,26 @@ export function step(s, env, dt) {
 }
 
 // ------------------------------------------------------------ drawing
-// Same flat-vector language as doghole, seen from above. What tells a
-// square-rigger from the schooner at a glance is the YARDS: dark lines
-// crossing each mast, braced round toward the wind, with the pale sail
-// bellied away downwind of them. What tells a galleon from an English
-// private ship is the CASTLES: the high block of her sterncastle and
-// the smaller one forward, where the race-built English hull is flush
-// and lean.
+// Daylight, from overhead: wooden decks you can read the planks on,
+// cream canvas with real weight, her shadow on the water, and her
+// colours streaming downwind. What tells a square-rigger from the
+// schooner is the YARDS; what tells the galleon from an Englishman is
+// the CASTLES, the ochre paint, the gilding, and the Cross of Burgundy.
 export function drawShip(ctx, T, s, t, C) {
   const c = s.cls;
   const L = c.len, B = c.beam;
-  ctx.save();
-  ctx.translate(T.X(s.x), T.Y(s.y));
-  ctx.rotate(s.hdg);
   const S = T.S;
+  const full = c.castles >= 1 ? 1 : 0;          // 1 = galleon proportions
+  const set = s.canvas;
+  const drawing = Math.min(1, (s.driveNow || 0) / .55);
+  const awaDeg = Math.abs(s.awa) * 180 / Math.PI;
+  // awa > 0 means the wind is on her PORT side, so leeward is to
+  // starboard: the canvas bellies and the lateen booms out that way
+  const sgn = s.awa > 0 ? 1 : -1;
+  const dwx = Math.sin(s.awa), dwy = Math.cos(s.awa);    // downwind, body frame
+  const brace = Math.min(55, Math.max(0, (180 - awaDeg) * .5)) * sgn * Math.PI / 180;
 
-  // water working round her, exactly doghole's: dark torn water astern,
-  // a bright lip of foam at the stem
-  const sp = Math.min(1, s.speedKn / 6);
-  if (sp > .05) {
-    const wob2 = Math.sin(t * 2.3 + 1.1) * .5;
-    ctx.globalAlpha = .18 + sp * .3;
-    ctx.fillStyle = "#0c161d";
-    ctx.beginPath();
-    ctx.ellipse(S(wob2), S(L * .58 + sp * 4), S(B * .34 + sp), S(L * .1 + sp * 5),
-                0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.globalAlpha = .30 + sp * .45;
-    ctx.strokeStyle = "#e8f4fb";
-    ctx.lineWidth = Math.max(1, S(.55));
-    for (const side of [-1, 1]) {
-      ctx.beginPath();
-      ctx.moveTo(S(side * B * .06), S(-L * .49));
-      ctx.quadraticCurveTo(S(side * (B * .5 + sp * 1.6)), S(-L * .3),
-                           S(side * (B * .56 + sp * 2)), S(-L * .08));
-      ctx.stroke();
-    }
-    ctx.fillStyle = "#dff0fa";
-    for (let i = 0; i < 7; i++) {
-      const sx2 = Math.sin(t * 2.2 + i * 1.9) * B * .5;
-      const sy2 = L * .52 + ((i * 2.3 + t * 9) % 12);
-      ctx.globalAlpha = (.5 - (sy2 - L * .52) / 24) * (.3 + sp * .6);
-      if (ctx.globalAlpha <= 0) continue;
-      ctx.fillRect(S(sx2), S(sy2), Math.max(1, S(.7)), Math.max(1, S(.7)));
-    }
-    ctx.globalAlpha = 1;
-  }
-
-  // the hull. A galleon is fuller forward and pinched at the stern; the
-  // English hull keeps doghole's leaner line.
-  const full = c.castles >= 1 ? 1 : 0;        // 1 = galleon proportions
-  const hull = (inset, col) => {
+  const hullPath = (inset) => {
     const b = B / 2 - inset, l = L / 2 - inset;
     ctx.beginPath();
     ctx.moveTo(0, S(-l - 2.2));
@@ -260,40 +238,111 @@ export function drawShip(ctx, T, s, t, C) {
     ctx.bezierCurveTo(S(-b), S(0),
                       S(-b * (.85 + .1 * full)), S(-l * .5), 0, S(-l - 2.2));
     ctx.closePath();
-    ctx.fillStyle = col; ctx.fill();
   };
-  hull(0, c.hull);
-  hull(.9, full ? "#2b2017" : "#1b242e");
 
-  // the castles. Drawn as raised blocks with a shadowed edge, the way
-  // doghole raises a roof: the lighter top face is what reads as height.
-  if (c.castles > 0) {
-    const k = c.castles;
-    // sterncastle, the big one, stepped in two
-    ctx.fillStyle = full ? "#3a2b1e" : "#28333e";
-    ctx.fillRect(S(-B * .33), S(L * .18), S(B * .66), S(L * .3 * k));
-    ctx.fillStyle = full ? "#4a3826" : "#32404c";
-    ctx.fillRect(S(-B * .26), S(L * .28), S(B * .52), S(L * .2 * k));
-    ctx.strokeStyle = "rgba(10,14,19,.7)";
-    ctx.lineWidth = Math.max(1, S(.5));
-    ctx.strokeRect(S(-B * .33), S(L * .18), S(B * .66), S(L * .3 * k));
-    // a gilded taffrail on the galleon, the one warm line on her
-    if (full) {
-      ctx.strokeStyle = "rgba(242,166,60,.8)";
-      ctx.lineWidth = Math.max(1, S(.6));
+  // ---- her shadow on the water, cast a little to the north-east,
+  //      which puts the sun high in the south-west where it belongs
+  ctx.save();
+  ctx.translate(T.X(s.x) + S(1.7), T.Y(s.y) - S(1.1));
+  ctx.rotate(s.hdg);
+  hullPath(-.6);
+  ctx.fillStyle = "rgba(10,30,40,.28)";
+  ctx.fill();
+  ctx.restore();
+
+  ctx.save();
+  ctx.translate(T.X(s.x), T.Y(s.y));
+  ctx.rotate(s.hdg);
+
+  // ---- water working round her
+  const sp = Math.min(1, s.speedKn / 6);
+  if (sp > .05) {
+    const wob2 = Math.sin(t * 2.3 + 1.1) * .5;
+    ctx.globalAlpha = .07 + sp * .11;
+    ctx.fillStyle = "#eefafb";                   // churned water, pale by day
+    ctx.beginPath();
+    ctx.ellipse(S(wob2), S(L * .6 + sp * 3), S(B * .26 + sp * .7), S(L * .09 + sp * 4),
+                0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = .35 + sp * .5;
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = Math.max(1, S(.55));
+    for (const side of [-1, 1]) {
       ctx.beginPath();
-      ctx.moveTo(S(-B * .26), S(L * .485));
-      ctx.lineTo(S(B * .26), S(L * .485));
+      ctx.moveTo(S(side * B * .06), S(-L * .49));
+      ctx.quadraticCurveTo(S(side * (B * .5 + sp * 1.6)), S(-L * .3),
+                           S(side * (B * .56 + sp * 2)), S(-L * .08));
       ctx.stroke();
     }
-    // forecastle
-    ctx.fillStyle = full ? "#3a2b1e" : "#28333e";
-    ctx.fillRect(S(-B * .24), S(-L * .44), S(B * .48), S(L * .14 * k));
-    ctx.strokeStyle = "rgba(10,14,19,.7)";
-    ctx.strokeRect(S(-B * .24), S(-L * .44), S(B * .48), S(L * .14 * k));
+    ctx.globalAlpha = 1;
   }
 
-  // treasure aboard, stowed abaft the mainmast where the deckload reads
+  // ---- the hull: wale, bulwark, then the planked deck
+  hullPath(0);  ctx.fillStyle = c.wale;  ctx.fill();
+  hullPath(.55); ctx.fillStyle = full ? "#6b4526" : "#5d4224"; ctx.fill();
+  hullPath(1.1); ctx.fillStyle = c.deck; ctx.fill();
+
+  // deck planks, running fore and aft, clipped to the deck
+  ctx.save();
+  hullPath(1.1); ctx.clip();
+  ctx.strokeStyle = "rgba(74,51,25,.4)";
+  ctx.lineWidth = Math.max(.5, S(.16));
+  for (let px = -B/2 + 1.4; px < B/2 - 1.0; px += .95) {
+    ctx.beginPath();
+    ctx.moveTo(S(px), S(-L * .52)); ctx.lineTo(S(px), S(L * .52));
+    ctx.stroke();
+  }
+  // main hatch and fore hatch, dark gratings
+  ctx.fillStyle = "rgba(40,26,13,.85)";
+  ctx.fillRect(S(-B * .17), S(-L * .07), S(B * .34), S(L * .13));
+  ctx.fillRect(S(-B * .12), S(-L * .33), S(B * .24), S(L * .08));
+  ctx.strokeStyle = "rgba(160,130,86,.5)";
+  ctx.strokeRect(S(-B * .17), S(-L * .07), S(B * .34), S(L * .13));
+  ctx.restore();
+
+  // guns run out along the rails, little black muzzles
+  const nG = Math.max(2, Math.floor(L / 8));
+  ctx.fillStyle = "#1c1612";
+  for (let g = 0; g < nG; g++) {
+    const gy = -L * .26 + (g + .5) * (L * .5 / nG);
+    for (const side of [-1, 1]) {
+      ctx.fillRect(S(side * (B/2 - .9) - .35), S(gy), Math.max(1, S(1.3)) * (side<0?-1:1), Math.max(1, S(.65)));
+    }
+  }
+
+  // ---- the castles, raised and lit from the south-west
+  if (c.castles > 0) {
+    const k = c.castles;
+    const block = (x, y, w, h, base, hi) => {
+      ctx.fillStyle = "rgba(20,12,6,.4)";                 // its shadow
+      ctx.fillRect(S(x) + S(.5), S(y) + S(.5), S(w), S(h));
+      ctx.fillStyle = base;
+      ctx.fillRect(S(x), S(y), S(w), S(h));
+      ctx.fillStyle = hi;                                  // the lit face
+      ctx.fillRect(S(x), S(y), S(w * .45), S(h));
+      ctx.strokeStyle = "rgba(25,15,8,.75)";
+      ctx.lineWidth = Math.max(.6, S(.2));
+      ctx.strokeRect(S(x), S(y), S(w), S(h));
+    };
+    // sterncastle, stepped: the half deck, then the poop above it
+    block(-B * .34, L * .17, B * .68, L * .3 * k, c.castle, c.castleHi);
+    block(-B * .26, L * .3,  B * .52, L * .18 * k, c.castleHi, full ? "#c07b40" : c.castleHi);
+    // forecastle
+    block(-B * .25, -L * .45, B * .5, L * .14 * k, c.castle, c.castleHi);
+    // the galleon's gilded taffrail and her two stern lanterns
+    if (full) {
+      ctx.strokeStyle = c.accent; ctx.lineWidth = Math.max(1, S(.5));
+      ctx.beginPath();
+      ctx.moveTo(S(-B * .25), S(L * .485)); ctx.lineTo(S(B * .25), S(L * .485));
+      ctx.stroke();
+      ctx.fillStyle = c.accent;
+      for (const lx of [-B * .16, B * .16]) {
+        ctx.beginPath(); ctx.arc(S(lx), S(L * .5), Math.max(1, S(.5)), 0, Math.PI * 2); ctx.fill();
+      }
+    }
+  }
+
+  // treasure aboard, stowed abaft the mainmast
   if (c.cap && s.cargo > .5) {
     const rows = Math.max(1, Math.round(s.cargo / c.cap * 5));
     for (let i = 0; i < rows; i++) {
@@ -302,111 +351,152 @@ export function drawShip(ctx, T, s, t, C) {
     }
   }
 
-  // bowsprit, steeved up and out over the stem
-  ctx.strokeStyle = c.trim; ctx.lineWidth = Math.max(1, S(.9));
+  // bowsprit, steeved out over the stem; the galleon gets her beakhead
+  ctx.strokeStyle = "#4a3319"; ctx.lineWidth = Math.max(1, S(.9));
   ctx.beginPath();
   ctx.moveTo(0, S(-L * .5)); ctx.lineTo(0, S(-L * .5 - L * .26));
   ctx.stroke();
+  if (full) {
+    ctx.fillStyle = c.castle;
+    ctx.beginPath();
+    ctx.moveTo(S(-B * .09), S(-L * .5 - 1));
+    ctx.lineTo(S(B * .09), S(-L * .5 - 1));
+    ctx.lineTo(0, S(-L * .5 - L * .13));
+    ctx.closePath(); ctx.fill();
+  }
 
-  // the wheel or whipstaff aft, and a man at it
-  ctx.strokeStyle = "#3a2c1d"; ctx.lineWidth = Math.max(1, S(.7));
-  ctx.beginPath(); ctx.arc(0, S(L * .44), S(1.2), 0, Math.PI * 2); ctx.stroke();
-  ctx.fillStyle = "#0a0e14";
-  ctx.beginPath(); ctx.arc(S(-B * .28), S(L * .1), S(.55), 0, Math.PI * 2); ctx.fill();
-  ctx.beginPath(); ctx.arc(S(B * .26), S(-L * .2), S(.55), 0, Math.PI * 2); ctx.fill();
+  // men on deck, for scale
+  ctx.fillStyle = "#2a1c10";
+  ctx.beginPath(); ctx.arc(S(-B * .28), S(L * .1), S(.5), 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(S(B * .26), S(-L * .2), S(.5), 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(0, S(L * .42), S(.5), 0, Math.PI * 2); ctx.fill();
 
   // rudder
-  ctx.strokeStyle = "#1b242c"; ctx.lineWidth = Math.max(1, S(1.1));
+  ctx.strokeStyle = "#2a1d10"; ctx.lineWidth = Math.max(1, S(1.1));
   ctx.beginPath();
   ctx.moveTo(0, S(L * .5)); ctx.lineTo(S(s.helm * 2.2), S(L * .5 + 3));
   ctx.stroke();
 
-  // ------------------------------------------------------------ the rig
-  // Three masts. Fore and main carry square canvas on braced yards; the
-  // mizzen carries a lateen, boomed out to leeward like the schooner's
-  // main, which is what these rigs actually wore aft.
-  const set = s.canvas;
-  const drawing = Math.min(1, (s.driveNow || 0) / .55);
-  const awaDeg = Math.abs(s.awa) * 180 / Math.PI;
-  const sgn = s.awa > 0 ? -1 : 1;              // sails belly to leeward
-  // the yards brace round toward the wind: square before the wind, hard
-  // round when she is close-hauled
-  const brace = Math.min(55, Math.max(0, (180 - awaDeg) * .5)) * sgn * Math.PI / 180;
-
+  // ---- the rig. Fore and main carry a course and a topsail on braced
+  //      yards; the mizzen a lateen; a spritsail under the bowsprit.
   const MASTS = [
-    { my: -L * .28, yard: B * 1.5, name: "fore" },
-    { my:  L * .02, yard: B * 1.8, name: "main" },
+    { my: -L * .28, yard: B * 1.55 },
+    { my:  L * .02, yard: B * 1.85 },
   ];
-  ctx.fillStyle = c.trim;
+  ctx.fillStyle = "#3a2a16";
   for (const m of MASTS.concat([{ my: L * .3 }])) {
-    ctx.beginPath(); ctx.arc(0, S(m.my), S(1.0), 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(0, S(m.my), S(.9), 0, Math.PI * 2); ctx.fill();
   }
+
+  // one band of canvas hung from a braced yard. Cream, with weight: a
+  // lit face toward the sun, a shaded foot, a seam down the middle.
+  const band = (mx, my, halfW, bell, footW) => {
+    const yx = Math.cos(brace) * halfW, yy = Math.sin(brace) * halfW;
+    const ax = -yx, ay = my - yy, bx = yx, by = my + yy;
+    const afx = -yx * footW + dwx * bell, afy = my - yy * footW + dwy * bell;
+    const bfx = yx * footW + dwx * bell,  bfy = my + yy * footW + dwy * bell;
+    ctx.globalAlpha = .5 + .45 * set * (.4 + .6 * drawing);
+    ctx.fillStyle = "#f1e7cf";
+    ctx.beginPath();
+    ctx.moveTo(S(ax), S(ay));
+    ctx.lineTo(S(bx), S(by));
+    ctx.lineTo(S(bfx), S(bfy));
+    ctx.quadraticCurveTo(S(dwx * bell * 1.55 + mx), S(my + dwy * bell * 1.55),
+                         S(afx), S(afy));
+    ctx.closePath();
+    ctx.fill();
+    // the shaded foot of the cloth
+    ctx.globalAlpha *= .5;
+    ctx.strokeStyle = "#a89878";
+    ctx.lineWidth = Math.max(.8, S(.45));
+    ctx.beginPath();
+    ctx.moveTo(S(bfx), S(bfy));
+    ctx.quadraticCurveTo(S(dwx * bell * 1.55 + mx), S(my + dwy * bell * 1.55),
+                         S(afx), S(afy));
+    ctx.stroke();
+    // the centre seam
+    ctx.beginPath();
+    ctx.moveTo(S(mx), S(my));
+    ctx.quadraticCurveTo(S(mx + dwx * bell * .7), S(my + dwy * bell * .7),
+                         S(mx + dwx * bell * 1.1), S(my + dwy * bell * 1.1));
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    // the yard, dark and solid over the canvas head
+    ctx.strokeStyle = "#2e2110";
+    ctx.lineWidth = Math.max(1, S(.6));
+    ctx.beginPath();
+    ctx.moveTo(S(ax), S(ay)); ctx.lineTo(S(bx), S(by));
+    ctx.stroke();
+  };
 
   if (set > .04) {
     for (const m of MASTS) {
-      const hw = m.yard / 2;
-      const yx = Math.cos(brace) * hw, yy = Math.sin(brace) * hw;
-      // the course, and a shorter topsail yard just above it: two yards
-      // is what says "ship" from overhead
-      for (const [f, dy] of [[1, 0], [.68, -L * .035]]) {
-        ctx.strokeStyle = c.trim;
-        ctx.lineWidth = Math.max(1, S(f === 1 ? 1.0 : .7));
-        ctx.beginPath();
-        ctx.moveTo(S(-yx * f), S(m.my + dy - yy * f));
-        ctx.lineTo(S(yx * f), S(m.my + dy + yy * f));
-        ctx.stroke();
-      }
-      // the sail: a BAND of canvas hung from the yard, its foot blown
-      // away downwind. A lens from tip to tip reads as a fin; a
-      // trapezoid with a curved foot reads as square canvas.
-      const bell = B * (.35 + .35 * drawing) * set;
-      const dwx = -Math.sin(s.awa), dwy = Math.cos(s.awa);   // downwind
-      const fx2 = .78;                       // the foot is a little narrower
-      ctx.globalAlpha = .18 + .42 * set * (.35 + .65 * drawing);
-      ctx.fillStyle = "#8d97a2";
-      ctx.beginPath();
-      ctx.moveTo(S(-yx), S(m.my - yy));
-      ctx.lineTo(S(yx), S(m.my + yy));
-      ctx.lineTo(S(yx * fx2 + dwx * bell), S(m.my + yy * fx2 + dwy * bell));
-      ctx.quadraticCurveTo(S(dwx * bell * 1.6), S(m.my + dwy * bell * 1.6),
-                           S(-yx * fx2 + dwx * bell), S(m.my - yy * fx2 + dwy * bell));
-      ctx.closePath();
-      ctx.fill();
-      ctx.globalAlpha = 1;
+      // topsail first (it sits forward of the course from overhead),
+      // then the course over it
+      band(0, m.my - L * .045, m.yard * .33, B * (.26 + .22 * drawing) * set, .72);
+      band(0, m.my,            m.yard * .5,  B * (.4 + .34 * drawing) * set, .78);
     }
     // the lateen mizzen, out to leeward
-    const out = B * 1.1 * (.35 + .65 * set) * sgn;
+    const out = B * 1.05 * (.35 + .65 * set) * sgn;
     const my = L * .3, len = L * .22;
-    ctx.strokeStyle = c.trim; ctx.lineWidth = Math.max(1, S(.8));
+    ctx.strokeStyle = "#2e2110"; ctx.lineWidth = Math.max(1, S(.6));
     ctx.beginPath();
     ctx.moveTo(0, S(my)); ctx.lineTo(S(out), S(my + len));
     ctx.stroke();
-    ctx.globalAlpha = .14 + .34 * set * (.35 + .65 * drawing);
-    ctx.fillStyle = "#98a3ae";
+    ctx.globalAlpha = .45 + .4 * set * (.4 + .6 * drawing);
+    ctx.fillStyle = "#ece2c8";
     ctx.beginPath();
     ctx.moveTo(0, S(my));
     ctx.quadraticCurveTo(S(out * .6), S(my + len * .45), S(out), S(my + len));
     ctx.lineTo(0, S(my + len));
     ctx.closePath(); ctx.fill();
     ctx.globalAlpha = 1;
-    // headsail on the bowsprit: a spritsail, square and small
-    const bx = Math.cos(brace) * B * .5, by = Math.sin(brace) * B * .5;
-    const sy0 = -L * .5 - L * .16;
-    ctx.strokeStyle = c.trim; ctx.lineWidth = Math.max(1, S(.6));
-    ctx.beginPath();
-    ctx.moveTo(S(-bx), S(sy0 - by)); ctx.lineTo(S(bx), S(sy0 + by));
-    ctx.stroke();
-    const sbell = B * .3 * set;
-    const sdx = -Math.sin(s.awa) * sbell, sdy = Math.cos(s.awa) * sbell;
-    ctx.globalAlpha = .14 + .3 * set * drawing;
-    ctx.fillStyle = "#98a3ae";
-    ctx.beginPath();
-    ctx.moveTo(S(-bx), S(sy0 - by));
-    ctx.lineTo(S(bx), S(sy0 + by));
-    ctx.lineTo(S(bx * .75 + sdx), S(sy0 + by * .75 + sdy));
-    ctx.lineTo(S(-bx * .75 + sdx), S(sy0 - by * .75 + sdy));
-    ctx.closePath(); ctx.fill();
+    // the spritsail under the bowsprit
+    band(0, -L * .5 - L * .16, B * .4, B * .26 * set, .75);
+  }
+
+  // ---- her colours, the ensign streaming downwind off the poop
+  {
+    const fl = Math.max(3, L * .14);             // flag length, yards
+    const fw = fl * .52;
+    const wave = Math.sin(t * 5 + s.x * .01) * .12;
+    const a = Math.atan2(dwy, dwx) + wave;
+    ctx.save();
+    ctx.translate(0, S(L * .46));                // the ensign staff, right aft
+    ctx.rotate(a);
+    ctx.translate(S(1.2), 0);
+    if (c.flag === "burgundy") {
+      ctx.fillStyle = "#efe6d2";
+      ctx.fillRect(0, S(-fw/2), S(fl), S(fw));
+      ctx.strokeStyle = "#b3362a";
+      ctx.lineWidth = Math.max(1, S(.4));
+      ctx.beginPath();                            // the ragged red saltire
+      ctx.moveTo(S(fl*.1), S(-fw*.34)); ctx.lineTo(S(fl*.9), S(fw*.34));
+      ctx.moveTo(S(fl*.1), S(fw*.34));  ctx.lineTo(S(fl*.9), S(-fw*.34));
+      ctx.stroke();
+    } else {
+      ctx.fillStyle = "#f4f0e6";
+      ctx.fillRect(0, S(-fw/2), S(fl), S(fw));
+      ctx.strokeStyle = "#c03a2a";
+      ctx.lineWidth = Math.max(1, S(.45));
+      ctx.beginPath();                            // St George's cross
+      ctx.moveTo(0, 0); ctx.lineTo(S(fl), 0);
+      ctx.moveTo(S(fl*.38), S(-fw/2)); ctx.lineTo(S(fl*.38), S(fw/2));
+      ctx.stroke();
+    }
+    ctx.strokeStyle = "rgba(30,20,10,.5)";
+    ctx.lineWidth = Math.max(.6, S(.2));
+    ctx.strokeRect(0, S(-fw/2), S(fl), S(fw));
+    ctx.restore();
+  }
+
+  // struck her colours: a white flag at the main instead of way on her
+  if (s.struck) {
+    ctx.fillStyle = "#ffffff";
+    ctx.globalAlpha = .6 + .4 * Math.max(0, Math.sin(t * 4));
+    ctx.beginPath(); ctx.arc(0, S(L * .02), Math.max(2, S(1.6)), 0, Math.PI * 2); ctx.fill();
     ctx.globalAlpha = 1;
   }
+
   ctx.restore();
 }

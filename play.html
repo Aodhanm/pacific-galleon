@@ -86,6 +86,8 @@ const cls = CLASSES[shipKey];
 let env, ship, prize, phase, elapsed, wp;
 let reload = 0, smoke = [], balls = [], splashes = [];
 let closure = 0, lastD = null, sailT = 0;
+let hold = 0, chestT = 0, chestFly = null;   // what is left in her, the transfer
+const PRIZE_HOLD = 120;                      // chests in her: far more than you can stow
 function reset(){
   env = CV.makeWeather();
   ship = makeShip(shipKey, CV.AMBUSH.x, CV.AMBUSH.y, CV.AMBUSH.hdg);
@@ -96,6 +98,7 @@ function reset(){
   phase = "brief"; elapsed = 0;
   reload = 0; smoke = []; balls = []; splashes = [];
   lastD = null; closure = 0;
+  hold = PRIZE_HOLD; chestT = 0; chestFly = null;
 }
 reset();
 
@@ -536,11 +539,15 @@ function prizeStep(dt){
 // so the game owns its audio outright: the sea bed, the guns, shot
 // striking home or falling short, canvas being worked, and the wreck.
 let A = null, sfxGain = null, seaGain = null, seaFilt = null;
+let windGain = null, windFilt = null, cannonBuf = null;
 function audioInit(){
   if (A) return;
   try { A = new (window.AudioContext || window.webkitAudioContext)(); } catch(e){ return; }
   if (A.state === "suspended") A.resume().catch(()=>{});
   sfxGain = A.createGain(); sfxGain.gain.value = 1; sfxGain.connect(A.destination);
+  // the cannon is KEDR's recorded report (cannon.m4a), one per gun
+  fetch("cannon.m4a").then(r => r.arrayBuffer())
+    .then(b => A.decodeAudioData(b)).then(b => { cannonBuf = b; }).catch(()=>{});
   const len = A.sampleRate * 2;
   const buf = A.createBuffer(1, len, A.sampleRate);
   const d = buf.getChannelData(0);
@@ -551,12 +558,38 @@ function audioInit(){
   seaGain = A.createGain(); seaGain.gain.value = 0;
   src2.connect(seaFilt); seaFilt.connect(seaGain); seaGain.connect(sfxGain);
   src2.start();
+  const wsrc = A.createBufferSource(); wsrc.buffer = buf; wsrc.loop = true;
+  wsrc.playbackRate.value = 1.7;
+  windFilt = A.createBiquadFilter(); windFilt.type = "bandpass";
+  windFilt.frequency.value = 700; windFilt.Q.value = .7;
+  windGain = A.createGain(); windGain.gain.value = 0;
+  wsrc.connect(windFilt); windFilt.connect(windGain); windGain.connect(sfxGain);
+  wsrc.start();
 }
 function seaLevel(){
   if (!seaGain) return;
   const lvl = .045 + env.swell * .3 + Math.min(.1, ship.speedKn * .013);
   seaGain.gain.setTargetAtTime(lvl, A.currentTime, .3);
   seaFilt.frequency.setTargetAtTime(420 + env.swell*800 + ship.speedKn*40, A.currentTime, .4);
+  // THE WIND IN THE SAILS: rises with how hard the canvas is actually
+  // drawing, flutters a little, and goes silent in irons or becalmed
+  if (windGain){
+    const draw = Math.min(1, (ship.driveNow || 0) / 1.2);
+    const flutter = 1 + Math.sin(env.t * 7.3) * .18 + Math.sin(env.t * 11.1) * .1;
+    windGain.gain.setTargetAtTime(draw * .11 * flutter, A.currentTime, .25);
+    windFilt.frequency.setTargetAtTime(560 + draw * 420 + env.swell * 300, A.currentTime, .3);
+  }
+}
+// the cloth filling with a WHOMP when she comes out of irons or the lee
+let wasDrawing = false;
+function sailFillCheck(){
+  const drawing = (ship.driveNow || 0) > .3 && ship.canvas > .25;
+  if (drawing && !wasDrawing && A){
+    playBuf(noiseBuf(.3, t2 => Math.sin(Math.PI * Math.min(1, t2*2.4)) * (1-t2)), .3,
+            "lowpass", 900);
+    tone("sine", 160, 70, .18, .1);
+  }
+  wasDrawing = drawing;
 }
 function noiseBuf(dur, curve){
   const n = Math.floor(A.sampleRate * dur);
@@ -592,16 +625,32 @@ function tone(type, f0, f1, dur, vol, delay){
   g.gain.exponentialRampToValueAtTime(0.0001, t0+dur);
   o.connect(g); g.connect(sfxGain); o.start(t0); o.stop(t0+dur+.03);
 }
-// A BROADSIDE: each gun a hard crack over a deep boom, the pieces going
-// off a hand apart, never as one.
+// A BROADSIDE: KEDR's recorded cannon, one report per gun, each a hand
+// apart and each at its own pitch, over a deep synth boom for body.
+// Falls back to the all-synth gun if the clip has not decoded.
 function sfxBroadside(nG){
   if (!A) return;
   for (let i = 0; i < nG; i++){
-    const dl = i * (.05 + Math.random()*.1);
-    tone("triangle", 85 + Math.random()*20, 32, .5, .5, dl);
-    playBuf(noiseBuf(.3, t2 => (1-t2)**2), .4, "lowpass", 620, 0, dl);
-    playBuf(noiseBuf(.06, t2 => (1-t2)**1.2), .22, "bandpass", 2100, 1.2, dl);
+    const dl = i * (.06 + Math.random()*.11);
+    if (cannonBuf){
+      const t0 = A.currentTime + dl;
+      const s2 = A.createBufferSource(); s2.buffer = cannonBuf;
+      s2.playbackRate.value = .88 + Math.random()*.26;
+      const g = A.createGain(); g.gain.value = .75;
+      s2.connect(g); g.connect(sfxGain); s2.start(t0);
+      tone("triangle", 70 + Math.random()*15, 28, .55, .3, dl);
+    } else {
+      tone("triangle", 85 + Math.random()*20, 32, .5, .5, dl);
+      playBuf(noiseBuf(.3, t2 => (1-t2)**2), .4, "lowpass", 620, 0, dl);
+      playBuf(noiseBuf(.06, t2 => (1-t2)**1.2), .22, "bandpass", 2100, 1.2, dl);
+    }
   }
+}
+// a chest coming over the rail: the clink, and the thud in the hold
+function sfxChest(){
+  tone("sine", 1250 + Math.random()*300, 900, .07, .06);
+  tone("sine", 1850 + Math.random()*350, 1300, .05, .04, .03);
+  tone("triangle", 140, 70, .16, .1, .05);
 }
 // shot falling short: the sea closing over it
 function sfxSplash(){
@@ -630,7 +679,8 @@ function sfxCrash(){
   }
 }
 window.__sfx = { broadside: n => sfxBroadside(n||5), splash: sfxSplash,
-                 hit: sfxHit, sail: up => sfxSail(up !== false), crash: sfxCrash };
+                 hit: sfxHit, sail: up => sfxSail(up !== false), crash: sfxCrash,
+                 chest: sfxChest };
 
 // -------------------------------------------------------------- music
 // The Marcha Real, slow and in the old style, rises when the galleon is
@@ -669,14 +719,15 @@ function winCard(){
   phase = "over";
   music("marcha", false);
   music("grenadiers", true, .5);
-  card(`<h1>Laid aboard</h1>
-    <p>Her rig is cut to pieces, her colours are down, and your grapnels are in
-    her rail, <b>${Math.floor(elapsed/60)}m ${Math.floor(elapsed%60)}s</b> from the
-    first sight of her. The boarding and the treasure are the next things this
-    game grows.</p>
-    <p class="src">Cavendish off this cape, 1587, battered the <i>Santa Ana</i> for
-    hours until she struck, and burned what he could not carry. Rogers, 1709, took
-    the <i>Encarnaci&oacute;n</i> in a morning.</p>
+  const took = Math.floor(ship.cargo);
+  card(`<h1>Away with the prize's gold</h1>
+    <p>You stand clear with <b>${took} chests</b> of her treasure aboard, in
+    <b>${Math.floor(elapsed/60)}m ${Math.floor(elapsed%60)}s</b>, and left
+    <b>${hold}</b> in her hold that your ship could not stow or you would not
+    wait for.</p>
+    <p class="src">Cavendish off this cape, 1587, took what the <i>Desire</i> could
+    carry out of the <i>Santa Ana</i> and burned the rest: there was always more
+    in a Manila ship than her takers could hold.</p>
     <div class="go">Enter to sail it again</div>`);
 }
 function loseCard(){
@@ -717,6 +768,7 @@ addEventListener("keydown", e => {
   if (k === " "){
     e.preventDefault();
     if (phase === "wait" || phase === "chase" || phase === "struck") fire();
+    else if (phase === "board") castOff();
   }
   if (k === "escape") location.href = "index.html";
 });
@@ -758,7 +810,16 @@ function hud(){
         : g.d <= RANGE
           ? '<span class="a">Lay her on your beam to bring the guns to bear</span>'
           : "Guns ready"}</div>`;
-  el("chase").innerHTML = (phase !== "brief" && phase !== "over") ? `
+  el("chase").innerHTML =
+    phase === "board" ? `
+    <div>Treasure aboard <b>${Math.floor(ship.cargo)}</b> / ${cls.cap} chests</div>
+    <div>Left in her hold <b>${hold}</b></div>
+    <div class="a">Every chest slows you</div>
+    <div class="g">SPACE &mdash; cast off and run</div>`
+    : phase === "escape" ? `
+    <div>Treasure aboard <b>${Math.floor(ship.cargo)}</b> / ${cls.cap} chests</div>
+    <div>Get clear <b>${Math.max(0, 750 - Math.round(d))} yd</b> to go</div>`
+    : (phase !== "brief" && phase !== "over") ? `
     <div>The galleon <b>${pts(brg)}</b>, <b>${d < 1000 ? Math.round(d) + " yd" : (d/CV.YD_PER_NM).toFixed(1) + " nm"}</b></div>
     <div>${closure > .05 ? `<span class="g">Closing, ${closure.toFixed(1)} kn</span>`
          : closure < -.05 ? `<span class="r">Stretching away, ${(-closure).toFixed(1)} kn</span>`
@@ -769,8 +830,11 @@ function hud(){
     wait: "Lie quiet. She is coming down the coast from the north-west; you will raise her topsails first. Work out to the point as she comes on, and do not let the arch rocks have you.",
     chase: "Run her down. Keep the wind on your quarter, point your bowsprit where she will be, and when you are inside four hundred yards lay her on your beam and give her the broadside.",
     struck: "She has struck her colours. Lay her aboard: close alongside and the grapnels will do the rest.",
+    board: "The grapnels are in her rail and the chests are coming over. Every one is money and every one is weight. Cast off when you have had enough, or when you dare not stay.",
+    escape: "Cast off and get clear, heavy as she is. Make for the open sea.",
   };
-  el("phase").textContent = {wait:"The ambush", chase:"The chase", struck:"She has struck"}[phase] || "";
+  el("phase").textContent = {wait:"The ambush", chase:"The chase", struck:"She has struck",
+    board:"Alongside", escape:"The run off"}[phase] || "";
   el("order").textContent = orders[phase] || "";
 }
 
@@ -858,12 +922,47 @@ function hazards(dt){
   if (ship.damage > 1) failCard("Bilged", "She pounded too long on the bank and opened up.");
 }
 
+// ---------------------------------------------- boarding and treasure
+// Grappled, the chests come over the rail one by one. Every chest is
+// money and every chest is weight: the cargo term in the physics means
+// the longer you stay, the slower you run. You will not empty her;
+// Cavendish could not either.
+function boardStep(dt){
+  // the grapple is doghole's warp code with a moving target
+  ship.warp = { x: prize.x, y: prize.y, hdg: prize.hdg };
+  ship.lines = 3;
+  prize.canvas = 0;
+  if (ship.cargo < cls.cap && hold > 0){
+    chestT += dt;
+    if (chestT > 1.1){
+      chestT = 0;
+      chestFly = { f: 0 };
+      ship.cargo += 1; hold -= 1;
+      sfxChest();
+    }
+  }
+  if (chestFly){
+    chestFly.f += dt * 2.2;
+    if (chestFly.f >= 1) chestFly = null;
+  }
+}
+function castOff(){
+  ship.warp = null; ship.lines = 0; chestFly = null;
+  phase = "escape";
+  if (A) playBuf(noiseBuf(.4, t2 => (1-t2)**1.6), .14, "bandpass", 2400, .7);
+}
+
 // ------------------------------------------------------------- phases
 function phasesStep(dt){
   const d = Math.hypot(prize.x-ship.x, prize.y-ship.y);
   if (phase === "wait" && d < 1700){ phase = "chase"; music("marcha", true, .4); }
   if ((phase === "chase" || phase === "struck") && prize.x > CV.ESCAPE_X && !prize.struck) loseCard();
-  if (phase === "struck" && d < 55) winCard();
+  if (phase === "struck" && d < 48){
+    phase = "board";
+    ship.canvas = Math.min(ship.canvas, .1);
+  }
+  if (phase === "board") boardStep(dt);
+  if (phase === "escape" && d > 750) winCard();
 }
 
 // -------------------------------------------------------------- loop
@@ -871,7 +970,8 @@ wakes.push(makeWakeOf(ship), makeWakeOf(prize));
 let last = performance.now();
 function frame(now){
   const dt = Math.min((now-last)/1000, .05); last = now;
-  const live = phase === "wait" || phase === "chase" || phase === "struck";
+  const live = phase === "wait" || phase === "chase" || phase === "struck"
+            || phase === "board" || phase === "escape";
   try {
     if (live){
       elapsed += dt;
@@ -885,6 +985,7 @@ function frame(now){
         sailT = .6; sfxSail(ship.canvas > canvasWas);
       }
       seaLevel();
+      sailFillCheck();
       prizeStep(dt);
       for (let i=0;i<7;i++){ step(ship, env, dt); step(prize, env, dt); }
       for (const w of wakes) wakeStep(w, dt);
@@ -912,6 +1013,29 @@ function frame(now){
   drawSurf(env.t);
   drawShip(ctx, T, prize, env.t, C);
   drawShip(ctx, T, ship, env.t, C);
+  // the grapple lines, and the chest on its way over the rail
+  if (phase === "board"){
+    ctx.strokeStyle = "rgba(60,42,20,.85)";
+    ctx.lineWidth = Math.max(1, T.S(.5));
+    for (const f of [-.25, .05, .3]){
+      const fx2 = Math.sin(ship.hdg), fy2 = -Math.cos(ship.hdg);
+      const px2 = Math.sin(prize.hdg), py2 = -Math.cos(prize.hdg);
+      ctx.beginPath();
+      ctx.moveTo(T.X(ship.x + fx2*ship.cls.len*f), T.Y(ship.y + fy2*ship.cls.len*f));
+      ctx.lineTo(T.X(prize.x + px2*prize.cls.len*f), T.Y(prize.y + py2*prize.cls.len*f));
+      ctx.stroke();
+    }
+    if (chestFly){
+      const f = chestFly.f;
+      const x = prize.x + (ship.x - prize.x) * f;
+      const y = prize.y + (ship.y - prize.y) * f - Math.sin(f * Math.PI) * 4;
+      ctx.fillStyle = "#8a5a1e";
+      ctx.fillRect(T.X(x) - T.S(1.1), T.Y(y) - T.S(.8), T.S(2.2), T.S(1.6));
+      ctx.strokeStyle = "#f2a63c";
+      ctx.lineWidth = Math.max(1, T.S(.3));
+      ctx.strokeRect(T.X(x) - T.S(1.1), T.Y(y) - T.S(.8), T.S(2.2), T.S(1.6));
+    }
+  }
   drawShots();
   if (phase !== "brief" && phase !== "over"){ drawSailMark(); drawRose(); }
   try { hud(); } catch (err) {
@@ -939,6 +1063,7 @@ window.__dev = {
   },
   snap(){ cam.x = ship.x; cam.y = ship.y; },
   fire(){ fire(); },
+  castOff(){ if (phase === "board") castOff(); },
   auto: null,
   tick(n = 600){
     const h = 1/60;
@@ -960,7 +1085,8 @@ window.__dev = {
     }
     return { d: Math.hypot(prize.x-ship.x, prize.y-ship.y),
              shipKn: ship.speedKn, prizeKn: prize.speedKn,
-             rig: prize.rigDamage || 0, struck: !!prize.struck, phase };
+             rig: prize.rigDamage || 0, struck: !!prize.struck, phase,
+             cargo: Math.floor(ship.cargo), hold };
   },
 };
 

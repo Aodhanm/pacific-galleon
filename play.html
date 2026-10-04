@@ -48,7 +48,7 @@
   <div class="br k" id="chase"></div>
   <div id="card"><div class="cardin" id="cardin"></div></div>
 </div>
-<audio id="marcha" src="marcha-real.m4a" loop preload="auto"></audio>
+<audio id="britannia" src="theme-britannia.m4a" loop preload="auto"></audio>
 <audio id="grenadiers" src="grenadiers.m4a" preload="auto"></audio>
 
 <script type="module">
@@ -90,6 +90,7 @@ let hold = 0, chestT = 0, chestFly = null;   // what is left in her, the transfe
 let preload = 0, pballs = [];                // HER guns, firing back at you
 let burn = 0, chestPops = [];                // she is afire; the +1s over your deck
 let birds = [], gullWait = 10 + Math.random()*12;
+let hits = [], damageFlash = 0, shake = 0;    // impact sparks, the red flash, a jolt
 const PRIZE_HOLD = 120;                      // chests in her: far more than you can stow
 function reset(){
   env = CV.makeWeather();
@@ -104,6 +105,7 @@ function reset(){
   hold = PRIZE_HOLD; chestT = 0; chestFly = null;
   preload = 3; pballs = []; burn = 0; chestPops = [];
   birds = []; gullWait = 10 + Math.random()*12;
+  hits = []; damageFlash = 0; shake = 0;
   ship.rigDamage = 0; ship.damage = 0;
 }
 reset();
@@ -127,6 +129,10 @@ function camUpdate(dt){
   const ty = ship.y + ship.vy*lead + (prize.y-ship.y)*bias;
   cam.x += (tx - cam.x) * Math.min(1, dt*3.0);
   cam.y += (ty - cam.y) * Math.min(1, dt*3.0);
+  if (shake > 0){
+    cam.x += (Math.random()-.5) * shake * 10;
+    cam.y += (Math.random()-.5) * shake * 10;
+  }
   T.k = W / Math.max(60, cam.span);
 }
 
@@ -419,35 +425,46 @@ function gunBearing(){
   const rel = norm(Math.atan2(dx, -dy) - ship.hdg);
   const a = Math.abs(rel) * 180/Math.PI;
   const d = Math.hypot(dx, dy);
-  return { rel, inArc: a > 35 && a < 145, side: rel > 0 ? 1 : -1, d };
+  // the guns bear only when she is near ABEAM: line up your broadside
+  return { rel, inArc: a > 62 && a < 118, side: rel > 0 ? 1 : -1, d };
 }
 function fire(){
-  if (phase === "over" || phase === "brief") return;
-  const g = gunBearing();
-  if (!g.inArc || g.d > RANGE || reload > 0) return;
+  if (phase === "over" || phase === "brief" || reload > 0) return;
   reload = 6;
   const c = ship.cls;
   const nG = Math.max(3, Math.floor(c.len / 7));
+  const g = gunBearing();
+  const canHit = g.inArc && g.d <= RANGE;      // only then is she in danger
+  const side = g.inArc ? g.side : (ship.lastSide || 1);  // else fire to starboard
+  ship.lastSide = side;
   sfxBroadside(nG);
-  sfxWhistle(Math.min(1, g.d / RANGE));
+  // shooting at nothing, the shot carries a long way; close in, hardly any
+  const flight = canHit ? .3 + (g.d / RANGE) * .6 : .9 + Math.random()*.4;
+  sfxWhistle(flight);
   const fx = Math.sin(ship.hdg), fy = -Math.cos(ship.hdg);
   const sx2 = Math.cos(ship.hdg), sy2 = Math.sin(ship.hdg);
   for (let i = 0; i < nG; i++){
     const along = -c.len * .26 + (i + .5) * (c.len * .5 / nG);
-    const gx = ship.x + fx * along + sx2 * g.side * c.beam * .5;
-    const gy = ship.y + fy * along + sy2 * g.side * c.beam * .5;
-    // powder smoke, rolling off downwind
+    const gx = ship.x + fx * along + sx2 * side * c.beam * .5;
+    const gy = ship.y + fy * along + sy2 * side * c.beam * .5;
     for (let s2 = 0; s2 < 3; s2++){
       smoke.push({ x: gx, y: gy, r: 2 + Math.random()*2, a: .85,
-        vx: sx2 * g.side * (6+Math.random()*5), vy: sy2 * g.side * (6+Math.random()*5) });
+        vx: sx2 * side * (6+Math.random()*5), vy: sy2 * side * (6+Math.random()*5) });
     }
-    // the ball, on its way
-    const spread = (Math.random()-.5) * (g.d * .22 + 18);
-    const tx = prize.x + fx * spread * .4 + sx2 * (Math.random()-.5)*26;
-    const ty = prize.y + fy * spread * .4 + sy2 * (Math.random()-.5)*26;
+    let tx, ty, hit = false;
+    if (canHit){
+      const spread = (Math.random()-.5) * (g.d * .22 + 18);
+      tx = prize.x + fx * spread * .4 + sx2 * (Math.random()-.5)*26;
+      ty = prize.y + fy * spread * .4 + sy2 * (Math.random()-.5)*26;
+      hit = Math.random() < Math.max(.18, .8 - g.d / RANGE * .62);
+    } else {
+      // no one in the arc: the shot just goes out to sea and splashes
+      const r = RANGE * (.7 + Math.random()*.5);     // a long way out to sea
+      tx = gx + sx2 * side * r + (Math.random()-.5)*30;
+      ty = gy + sy2 * side * r + (Math.random()-.5)*30;
+    }
     balls.push({ x: gx, y: gy, tx, ty, t: 0,
-      dur: .28 + g.d/RANGE * .3,
-      hit: Math.random() < Math.max(.18, .8 - g.d / RANGE * .62) });
+      dur: flight * (.92 + Math.random()*.16), hit });
   }
 }
 // SHE FIRES BACK. Historically some of these galleons had their guns
@@ -458,7 +475,7 @@ function prizeGunBearing(){
   const dx = ship.x - prize.x, dy = ship.y - prize.y;
   const rel = norm(Math.atan2(dx, -dy) - prize.hdg);
   const a = Math.abs(rel) * 180/Math.PI;
-  return { inArc: a > 30 && a < 150, side: rel > 0 ? 1 : -1,
+  return { inArc: a > 60 && a < 120, side: rel > 0 ? 1 : -1,
            d: Math.hypot(dx, dy) };
 }
 function prizeFire(){
@@ -470,7 +487,8 @@ function prizeFire(){
   const fx = Math.sin(prize.hdg), fy = -Math.cos(prize.hdg);
   const sx2 = Math.cos(prize.hdg), sy2 = Math.sin(prize.hdg);
   sfxBroadside(nG);
-  sfxWhistle(Math.min(1, g.d / RANGE));
+  const pflight = .3 + (g.d / RANGE) * .6;
+  sfxWhistle(pflight);
   for (let i = 0; i < nG; i++){
     const along = -c.len*.26 + (i+.5)*(c.len*.5/nG);
     const gx = prize.x + fx*along + sx2*g.side*c.beam*.5;
@@ -498,8 +516,8 @@ function combatStep(dt){
       if (b.hit){
         ship.rigDamage = Math.min(1, (ship.rigDamage||0) + .035);
         ship.damage += .075;
-        smoke.push({ x: b.tx, y: b.ty, r: 1.6, a: .8,
-          vx: (Math.random()-.5)*4, vy: (Math.random()-.5)*4 });
+        hits.push({ x: b.tx, y: b.ty, t: 0, mine: false });
+        damageFlash = .55; shake = 1;
         sfxHit();
       } else { splashes.push({ x: b.tx, y: b.ty, t: 0 }); }
       pballs.splice(i, 1);
@@ -528,8 +546,7 @@ function combatStep(dt){
     if (b.t >= b.dur){
       if (b.hit){
         prize.rigDamage = Math.min(1, (prize.rigDamage||0) + .09);
-        smoke.push({ x: b.tx, y: b.ty, r: 1.6, a: .8,
-          vx: (Math.random()-.5)*4, vy: (Math.random()-.5)*4 });
+        hits.push({ x: b.tx, y: b.ty, t: 0, mine: true });
         sfxHit();
       } else {
         splashes.push({ x: b.tx, y: b.ty, t: 0 });
@@ -542,6 +559,10 @@ function combatStep(dt){
   splashes = splashes.filter(sp => sp.t < .9);
   for (const p of chestPops) p.t += dt;
   chestPops = chestPops.filter(p => p.t < 1.1);
+  for (const h of hits) h.t += dt;
+  hits = hits.filter(h => h.t < .5);
+  damageFlash = Math.max(0, damageFlash - dt);
+  shake = Math.max(0, shake - dt*2.4);
   if (!prize.struck && (prize.rigDamage||0) >= .75){
     prize.struck = true;
     phase = "struck";
@@ -585,7 +606,28 @@ function drawShots(){
     ctx.arc(T.X(s2.x), T.Y(s2.y), T.S(s2.r), 0, Math.PI*2);
     ctx.fill();
   }
-  ctx.globalAlpha = 1;
+  // impact bursts where shot strikes home: a bright flash, sparks, splinters
+  for (const h of hits){
+    const f = h.t / .5;
+    const x = T.X(h.x), y = T.Y(h.y);
+    ctx.globalAlpha = (1 - f);
+    // the flash
+    ctx.fillStyle = h.mine ? "#ffe08a" : "#ff9a5a";
+    ctx.beginPath(); ctx.arc(x, y, T.S(2 + f*5), 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath(); ctx.arc(x, y, T.S(1.2 + f*2), 0, Math.PI*2); ctx.fill();
+    // splinters flung out
+    ctx.strokeStyle = "rgba(60,42,22,.9)";
+    ctx.lineWidth = Math.max(1, T.S(.5));
+    for (let k = 0; k < 6; k++){
+      const a2 = k*1.05 + h.x, r = f*T.S(9);
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + Math.cos(a2)*r, y + Math.sin(a2)*r);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
   // flames licking up off her when she burns
   if (burn > 0){
     for (let i = 0; i < 10; i++){
@@ -736,19 +778,22 @@ function sfxBroadside(nG){
   }
   tone("triangle", 72 + Math.random()*14, 28, .5, .3);
 }
-// the shot whistling away toward a distant target. range 0..1 of RANGE.
-function sfxWhistle(range){
-  if (!A || !whistleBuf || range < .35) return;        // only an "away" shot
+// the shot whistling THROUGH its flight: it starts just after the bang
+// and is cut the instant the ball lands, so the whistle tracks the shot.
+// flight = the ball's time in the air, in seconds.
+function sfxWhistle(flight){
+  if (!A || !whistleBuf || flight < .4) return;   // no whistle at close range
   const s2 = A.createBufferSource(); s2.buffer = whistleBuf;
-  // a shorter flight whistles higher and quicker; a long one draws out
-  s2.playbackRate.value = 1.7 - range*.7;
-  const g = A.createGain(); g.gain.value = .0001;
+  s2.playbackRate.value = 1.25 - Math.min(.5, flight*.5);   // longer flight, lower
+  const g = A.createGain();
   s2.connect(g); g.connect(sfxGain);
-  const t0 = A.currentTime + .12;                        // just after the bang
+  const t0 = A.currentTime + .1;                            // just after the bang
+  const end = t0 + Math.max(.18, flight - .06);             // cut as it lands
   g.gain.setValueAtTime(.0001, t0);
-  g.gain.exponentialRampToValueAtTime(.3 + .35*range, t0 + .1);
-  g.gain.exponentialRampToValueAtTime(.0001, t0 + .3 + range*.5);
-  s2.start(t0);
+  g.gain.exponentialRampToValueAtTime(.4, t0 + .06);
+  g.gain.setValueAtTime(.4, Math.max(t0 + .07, end - .05));
+  g.gain.exponentialRampToValueAtTime(.0001, end);
+  s2.start(t0); s2.stop(end + .03);
 }
 // treasure over the rail: the cash register, cut short
 function sfxChest(){
@@ -840,7 +885,7 @@ card(`<h1>Pacific Galleon</h1>
 
 function winCard(){
   phase = "over";
-  music("marcha", false);
+  music("britannia", false);
   music("grenadiers", true, .5);
   const took = Math.floor(ship.cargo);
   const fired = burn > 0;
@@ -858,7 +903,7 @@ function winCard(){
 }
 function loseCard(){
   phase = "over";
-  music("marcha", false);
+  music("britannia", false);
   card(`<h1>She is round the cape</h1>
     <p>The galleon has hauled away east for Acapulco with her treasure under
     hatches. A stern chase is a long chase, and this one is over.</p>
@@ -866,7 +911,7 @@ function loseCard(){
 }
 function failCard(reason, detail){
   phase = "over";
-  music("marcha", false);
+  music("britannia", false);
   sfxCrash();
   card(`<h1>${reason}</h1><p>${detail}</p>
     <div class="go">Enter to try her again</div>`);
@@ -878,10 +923,10 @@ addEventListener("keydown", e => {
   const k = e.key.toLowerCase();
   keys[k] = true;
   if (k === "enter"){
-    if (phase === "brief"){ hideCard(); phase = "wait"; audioInit(); }
+    if (phase === "brief"){ hideCard(); phase = "wait"; audioInit(); music("britannia", true, .45); }
     else if (phase === "over"){
       music("grenadiers", false);
-      reset(); hideCard(); phase = "wait";
+      reset(); hideCard(); phase = "wait"; music("britannia", true, .45);
     }
   }
   if (k === "m"){
@@ -936,9 +981,9 @@ function hud(){
       ? `<span class="a">Guns reloading&hellip; ${reload.toFixed(0)}s</span>`
       : g.inArc && g.d <= RANGE
         ? `<span class="g">SPACE &mdash; the ${g.side>0?"starboard":"larboard"} broadside</span>`
-        : g.d <= RANGE
-          ? '<span class="a">Lay her on your beam to bring the guns to bear</span>'
-          : "Guns ready"}</div>
+        : g.inArc && g.d <= RANGE
+          ? `<span class="g">SPACE &mdash; the ${g.side>0?"starboard":"larboard"} broadside</span>`
+          : '<span class="g">SPACE &mdash; fire a broadside</span>'}</div>
     ${(ship.damage > .02 || (ship.rigDamage||0) > .02) ? `<div class="r">Your ship: ${
       ship.damage > .66 ? "sorely battered" : ship.damage > .3 ? "knocked about" : "taking hits"}${
       (ship.rigDamage||0) > .05 ? ", rigging cut" : ""}</div>` : ""}`;
@@ -1169,7 +1214,7 @@ function burnHer(){
 // ------------------------------------------------------------- phases
 function phasesStep(dt){
   const d = Math.hypot(prize.x-ship.x, prize.y-ship.y);
-  if (phase === "wait" && d < 1700){ phase = "chase"; music("marcha", true, .4); }
+  if (phase === "wait" && d < 1700){ phase = "chase"; }
   if ((phase === "chase" || phase === "struck") && prize.x > CV.ESCAPE_X && !prize.struck) loseCard();
   if (phase === "struck" && d < 48){
     phase = "board";
@@ -1208,15 +1253,22 @@ function frame(now){
       // the odd bird crossing the view, and now and then a cry
       gullWait -= dt;
       if (gullWait <= 0){
-        gullWait = 14 + Math.random()*20;
-        // a bird passes across screen, world-anchored near the ship
-        const ang = Math.random()*Math.PI*2, dist = 180 + Math.random()*160;
-        birds.push({ x: ship.x + Math.cos(ang)*dist, y: ship.y + Math.sin(ang)*dist,
-          vx: (Math.random()-.5)*34, vy: (Math.random()-.5)*20, t: 0, cried: false });
-        if (Math.random() < .6) sfxGull();
+        gullWait = 16 + Math.random()*22;      // now and then, not too often
+        // enter at one side of the view and fly clean across it
+        const halfW = (W/2)/T.k, halfH = (H/2)/T.k;
+        const dir = Math.random() < .5 ? 1 : -1;
+        const sx = cam.x - dir*(halfW + 40);
+        const sy = cam.y + (Math.random()-.5)*halfH*1.2;
+        birds.push({ x: sx, y: sy, vx: dir*(70+Math.random()*40),
+          vy: (Math.random()-.5)*14, t: 0, cried: false, span: (halfW*2+80) });
+        if (Math.random() < .6) sfxGull();      // a cry as it comes over
       }
-      for (const b of birds){ b.x += b.vx*dt; b.y += b.vy*dt; b.t += dt; }
-      birds = birds.filter(b => b.t < 9);
+      for (const b of birds){
+        b.x += b.vx*dt; b.y += b.vy*dt; b.t += dt;
+        // a second cry somewhere mid-crossing, occasionally
+        if (!b.cried && b.t > 1.5 && Math.random() < dt*.4){ b.cried = true; sfxGull(); }
+      }
+      birds = birds.filter(b => b.t < 14);
       prizeStep(dt);
       for (let i=0;i<7;i++){ step(ship, env, dt); step(prize, env, dt); }
       for (const w of wakes) wakeStep(w, dt);
@@ -1272,6 +1324,13 @@ function frame(now){
   if (phase === "board") drawTreasureInset();
   drawChestPops();
   if (phase !== "brief" && phase !== "over"){ drawSailMark(); drawRose(); }
+  if (damageFlash > 0){
+    const a = damageFlash / .55;
+    const g2 = ctx.createRadialGradient(W/2, H/2, Math.min(W,H)*.3, W/2, H/2, Math.max(W,H)*.7);
+    g2.addColorStop(0, "rgba(180,30,20,0)");
+    g2.addColorStop(1, `rgba(180,30,20,${.5*a})`);
+    ctx.fillStyle = g2; ctx.fillRect(0, 0, W, H);
+  }
   try { hud(); } catch (err) {
     window.__hudErr = window.__hudErr || [];
     if (window.__hudErr.length < 12) window.__hudErr.push(String(err));

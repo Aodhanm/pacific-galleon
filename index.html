@@ -53,9 +53,7 @@ addEventListener("resize", resize); resize();
 
 // one cannon report per broadside: a small pool of the Victory single
 // shot, started muted until the first gesture so autoplay is happy
-const shotPool = Array.from({length: 3}, () => {
-  const a = new Audio("cannon-one.m4a"); a.volume = .28; return a;
-});
+const rollSnd = ["cannon.m4a","cannon2.m4a"].map(f => { const a = new Audio(f); a.volume = .3; return a; });
 let shotI = 0, audioOn = false;
 const gullSnd = ["gull1.m4a","gull2.m4a"].map(f => { const a = new Audio(f); a.volume = .6; return a; });
 const splashSnd = Array.from({length: 6}, () => { const a = new Audio("splash.m4a"); a.volume = .35; return a; });
@@ -77,8 +75,8 @@ function gullStep(dt){
 }
 function shoot(){
   if (!audioOn) return;
-  const a = shotPool[shotI = (shotI+1) % shotPool.length];
-  try { a.currentTime = 0; a.volume = .26; a.play().catch(()=>{}); } catch(e){}
+  const a = rollSnd[shotI = (shotI+1) % rollSnd.length];
+  try { a.currentTime = 0; a.volume = .3; a.play().catch(()=>{}); } catch(e){}
 }
 
 const HORIZON = () => H * .52;
@@ -551,7 +549,7 @@ function drawProfileShip(kind, x, y, s, face, t, ph){
 }
 
 // ------------------------------------------------- the gunnery between them
-let puffs = [], flashes = [], splash2 = [];
+let puffs = [], flashes = [], splash2 = [], balls = [];
 let nextBroadside = 1.6;
 function battleStep(dt, t){
   nextBroadside -= dt;
@@ -559,26 +557,30 @@ function battleStep(dt, t){
     // they take turns
     const eng = Math.random() < .55;
     nextBroadside = 2.8 + Math.random()*3;
-    const gx = eng ? W*.335 : W*.615, gy = HORIZON() + H*.115;
-    const dir = eng ? 1 : -1;
-    flashes.push({ x: gx, y: gy - H*.02, t: 0, dir });
+    const waterY = HORIZON() + H*.14;
+    const engX = W*.25, galX = W*.72;
+    const fromX = eng ? engX + W*.1 : galX - W*.13;    // her disengaged... no, her
+    const gx = eng ? engX + W*.11 : galX - W*.14;      // engaged-side muzzles
+    const gy = waterY - H*.03;
+    const dir = eng ? 1 : -1;                          // toward the other ship
+    const toX = eng ? galX - W*.08 : engX + W*.08;     // the shot falls short of her
+    flashes.push({ x: gx, y: gy, t: 0, dir });
     shoot();
-    // a great bank of powder smoke rolling off her side
+    // powder smoke rolling off her engaged side
     for (let i = 0; i < 11; i++){
-      puffs.push({
-        x: gx + dir * (8 + Math.random()*58), y: gy - H*.005 - Math.random()*H*.06,
+      puffs.push({ x: gx + dir*(8 + Math.random()*58), y: gy - Math.random()*H*.05,
         r: 7 + Math.random()*13, a: .9,
-        vx: dir * (16 + Math.random()*26), vy: -4 - Math.random()*8,
-      });
+        vx: dir*(16 + Math.random()*26), vy: -4 - Math.random()*8 });
     }
     if (puffs.length > 90) puffs.splice(0, puffs.length - 90);
-    // bigger splashes, a short fall of them around the other hull
-    const n = 3 + (Math.random()*3|0);
-    for (let i = 0; i < n; i++){
-      const delay = .2 + Math.random()*.6, big = Math.random() < .5;
-      splash2.push({ x: W*.46 + (Math.random()-.5)*W*.16, y: gy + H*.015 + Math.random()*H*.05,
-                     t: -delay, big });
-      setTimeout(() => splashSound(big), (.42 + delay) * 1000);   // as each falls
+    // the SHOT: one ball per gun, each flying across and landing as one
+    // splash, so there are exactly as many splashes as shots
+    const nShots = 4 + (Math.random()*3|0);
+    for (let i = 0; i < nShots; i++){
+      const tx = toX + (Math.random()-.5)*W*.07;
+      const ty = waterY + H*.01 + Math.random()*H*.03;
+      balls.push({ x0: gx + dir*(10+Math.random()*14), y0: gy,
+        tx, ty, t: 0, dur: .55 + Math.random()*.45, big: Math.random() < .5, hit: false });
     }
   }
   for (const p of puffs){
@@ -590,6 +592,17 @@ function battleStep(dt, t){
   puffs = puffs.filter(p => p.a > 0);
   for (const f of flashes) f.t += dt;
   flashes = flashes.filter(f => f.t < .14);
+  for (const b of balls){
+    if (b.hit) continue;
+    b.t += dt;
+    if (b.t >= b.dur){
+      b.hit = true;
+      splash2.push({ x: b.tx, y: b.ty, t: 0, big: b.big });
+      splashSound(b.big);
+    }
+  }
+  balls = balls.filter(b => !b.hit || true);     // kept until splash fades below
+  balls = balls.filter(b => b.t < b.dur + .05);
   for (const sp of splash2) sp.t += dt;
   splash2 = splash2.filter(sp => sp.t < 1);
 }
@@ -627,6 +640,14 @@ function drawBattleFx(){
         ctx.fill();
       }
     }
+  }
+  ctx.fillStyle = "#1c1712";
+  for (const b of balls){
+    if (b.hit) continue;
+    const f = b.t / b.dur;
+    const x = b.x0 + (b.tx - b.x0)*f;
+    const y = b.y0 + (b.ty - b.y0)*f - Math.sin(f*Math.PI)*H*.06;   // the arc
+    ctx.beginPath(); ctx.arc(x, y, Math.max(2, H*.004), 0, Math.PI*2); ctx.fill();
   }
   for (const p of puffs){
     ctx.globalAlpha = Math.max(0, p.a) * .9;

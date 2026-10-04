@@ -285,7 +285,8 @@ function texBurgundy(){ return makeFlagTex("burg", (g,W,H) => {
 }); }
 // blit a flag texture flying from the staff at (x,y) toward -x (leeward),
 // rippling. w,h = flag size; t drives the wave.
-function flyFlag(tex, x, y, w, h, t, seed){
+function flyFlag(tex, x, y, w, h, t, seed, dir){
+  dir = dir || -1;                                   // -1 aft, +1 forward
   const N = 20, TW = tex.width, TH = tex.height;
   for (let i = 0; i < N; i++){
     const f0 = i/N, f1 = (i+1)/N;
@@ -293,10 +294,11 @@ function flyFlag(tex, x, y, w, h, t, seed){
     const wv = Math.sin(f0*7 - t*6 + seed);
     const dy = y + wv*amp;
     const sq = 1 + .12*Math.cos(f0*7 - t*6 + seed);  // columns squash a little
+    const left = dir < 0 ? x - f1*w : x + f0*w;
     ctx.save();
     ctx.globalAlpha = .9 - .25*Math.max(0,-wv);      // troughs sit in shadow
     ctx.drawImage(tex, f0*TW, 0, (f1-f0)*TW, TH,
-                  x - f1*w, dy - h/2*sq, w/N + .5, h*sq);
+                  left, dy - h/2*sq, w/N + .5, h*sq);
     ctx.restore();
   }
 }
@@ -521,10 +523,10 @@ function drawProfileShip(kind, x, y, s, face, t, ph){
   // ---- her colours, flying from the staffs
   if (gal){
     flyFlag(texBurgundy(), -L*.5, sStern - s*.16, s*.15, s*.1, t, ph);
-    flyFlag(texBurgundy(), L*.71, deck - s*.1, s*.08, s*.055, t, ph+2);
+    flyFlag(texBurgundy(), L*.73, deck - s*.11, s*.08, s*.055, t, ph+2, 1);
   } else {
     flyFlag(texRedEnsign(), -L*.47, sStern - s*.02, s*.16, s*.1, t, ph);
-    flyFlag(texUnionJack(), L*.73, deck - s*.1, s*.07, s*.05, t, ph+2);
+    flyFlag(texUnionJack(), L*.74, deck - s*.11, s*.07, s*.05, t, ph+2, 1);
   }
 
   ctx.restore();

@@ -781,8 +781,8 @@ function seaLevel(){
   // drawing, flutters a little, and goes silent in irons or becalmed
   if (windGain){
     const draw = Math.min(1, (ship.driveNow || 0) / 1.2);
-    const flutter = 1 + Math.sin(env.t * 7.3) * .18 + Math.sin(env.t * 11.1) * .1;
-    windGain.gain.setTargetAtTime(draw * .11 * flutter, A.currentTime, .25);
+    const flutter = 1 + Math.sin(env.t * 7.3) * .15;
+    windGain.gain.setTargetAtTime(draw * .035 * flutter, A.currentTime, .3);
     windFilt.frequency.setTargetAtTime(560 + draw * 420 + env.swell * 300, A.currentTime, .3);
   }
 }
@@ -791,9 +791,9 @@ let wasDrawing = false;
 function sailFillCheck(){
   const drawing = (ship.driveNow || 0) > .3 && ship.canvas > .25;
   if (drawing && !wasDrawing && A){
-    playBuf(noiseBuf(.3, t2 => Math.sin(Math.PI * Math.min(1, t2*2.4)) * (1-t2)), .3,
-            "lowpass", 900);
-    tone("sine", 160, 70, .18, .1);
+    playBuf(noiseBuf(.3, t2 => Math.sin(Math.PI * Math.min(1, t2*2.4)) * (1-t2)), .1,
+            "lowpass", 800);
+    tone("sine", 150, 70, .16, .04);
   }
   wasDrawing = drawing;
 }
@@ -908,9 +908,9 @@ function sfxHit(){
   }
 }
 function sfxSail(up){
-  playBuf(noiseBuf(.8, t2 => Math.sin(Math.PI*t2) * (.6 + .4*Math.sin(t2*38))),
-          up ? .12 : .08, "bandpass", up ? 1800 : 1200, .8);
-  tone("sine", up ? 420 : 300, up ? 900 : 200, .45, .025);
+  playBuf(noiseBuf(.7, t2 => Math.sin(Math.PI*t2) * (.6 + .4*Math.sin(t2*38))),
+          up ? .05 : .035, "bandpass", up ? 1700 : 1150, .8);
+  tone("sine", up ? 420 : 300, up ? 900 : 200, .4, .012);
 }
 function sfxCrash(){
   playBuf(noiseBuf(1.8, t2 => Math.pow(1-t2, 2.2)), .5, "lowpass", 900);
@@ -1018,8 +1018,9 @@ addEventListener("keydown", e => {
     e.preventDefault();
     fire();                                    // SPACE: the broadside, any time
   }
-  if (k === "g"){                              // G: grapple and board, alongside a struck ship
+  if (k === "g"){                              // G: grapple a struck ship; press again to cast off
     if (phase === "struck" && canBoard()) doBoard();
+    else if (phase === "board") castOff();
   }
   if (k === "c"){
     if (phase === "board") castOff();          // C: take your gold and slip away
@@ -1075,7 +1076,7 @@ function hud(){
     <div>Treasure aboard <b>${Math.floor(ship.cargo)}</b> / ${cls.cap} chests</div>
     <div>Left in her hold <b>${hold}</b></div>
     <div class="a">Every chest slows you</div>
-    <div class="g">C &mdash; cast off and run with your gold</div>
+    <div class="g">G or C &mdash; cast off and run with your gold</div>
     <div class="r">X &mdash; fire her and leave her burning</div>`
     : phase === "escape" ? (() => {
       const threat = consort || prize;
@@ -1101,7 +1102,7 @@ function hud(){
     wait: "Lie quiet. She is coming down the coast from the north-west; you will raise her topsails first. Work out to the point as she comes on, and do not let the arch rocks have you.",
     chase: "Run her down and lay her on your beam for the broadside, but mind her own guns: she will fire back. Cut her rig up until she strikes.",
     struck: "She has struck her colours. Close within hail and press G to grapple and board her.",
-    board: "The grapnels are in her rail and the chests are coming over. Press C to cast off with your gold, or X to fire her and leave her burning. Her consort is coming.",
+    board: "The grapnels are in her rail and the chests are coming over. Press G or C to cast off with your gold, or X to fire her and leave her burning. Her consort is coming.",
     escape: "Cast off and get clear, heavy as she is. Make for the open sea.",
   };
   el("phase").textContent = {wait:"The ambush", chase:"The chase", struck:"She has struck",

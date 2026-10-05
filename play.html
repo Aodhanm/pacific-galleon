@@ -427,10 +427,12 @@ function gunBearing(target){
   const a = Math.abs(rel) * 180/Math.PI;
   const d = Math.hypot(dx, dy);
   // the guns bear only when she is near ABEAM: line up your broadside
-  return { rel, inArc: a > 62 && a < 118, side: rel > 0 ? 1 : -1, d, tg };
+  return { rel, inArc: a > 52 && a < 128, side: rel > 0 ? 1 : -1, d, tg };
 }
 // of all the enemies afloat, the one your broadside can actually hit
 function targetInArc(){
+  // fire at the nearest enemy your broadside bears on: the ship you have
+  // laid alongside, or the Begona when you turn your guns on her
   let best = null;
   for (const e of [prize, consort]){
     if (!e || e.gone) continue;
@@ -444,14 +446,19 @@ function fire(){
   reload = 6;
   const c = ship.cls;
   const nG = Math.max(3, Math.floor(c.len / 7));
-  const g = targetInArc();                      // prize or consort, whichever bears
-  const canHit = !!g;
-  const tgt = g ? g.tg : null;
-  const side = g ? g.side : (ship.lastSide || 1);
+  let g, canHit, tgt, side;
+  if (phase === "board"){
+    // laid alongside her: a broadside goes point-blank into the prize
+    g = gunBearing(prize); tgt = prize; canHit = true; side = g.side;
+  } else {
+    g = targetInArc();                          // prize or consort, whichever bears
+    canHit = !!g; tgt = g ? g.tg : null;
+    side = g ? g.side : (ship.lastSide || 1);
+  }
   ship.lastSide = side;
   sfxBroadside(nG);
   // shooting at nothing, the shot carries a long way; close in, hardly any
-  const flight = canHit ? .3 + (g.d / RANGE) * .6 : .9 + Math.random()*.4;
+  const flight = canHit ? .2 + (g.d / RANGE) * .6 : .9 + Math.random()*.4;
   sfxWhistle(flight);
   const fx = Math.sin(ship.hdg), fy = -Math.cos(ship.hdg);
   const sx2 = Math.cos(ship.hdg), sy2 = Math.sin(ship.hdg);
@@ -468,7 +475,7 @@ function fire(){
       const spread = (Math.random()-.5) * (g.d * .22 + 18);
       tx = tgt.x + fx * spread * .4 + sx2 * (Math.random()-.5)*26;
       ty = tgt.y + fy * spread * .4 + sy2 * (Math.random()-.5)*26;
-      hit = Math.random() < Math.max(.18, .8 - g.d / RANGE * .62);
+      hit = phase === "board" ? true : Math.random() < Math.max(.18, .8 - g.d / RANGE * .62);
     } else {
       // no one in the arc: the shot just goes out to sea and splashes
       const r = RANGE * (.7 + Math.random()*.5);     // a long way out to sea
@@ -559,11 +566,13 @@ function combatStep(dt){
       const tg = b.target || prize;
       if (b.hit){
         if (tg.struck){
-          // a struck ship can still be battered under: round shot floods
-          // her until she settles and goes down
-          tg.flood = (tg.flood || 0) + .06;
-          tg.sink = Math.min(.9, (tg.sink || 0) + .05);
-          if (tg.flood >= 1) tg.gone = true;       // sunk by gunfire
+          // she has struck: a broadside into her now sets her ablaze and
+          // floods her, and she burns down and sinks
+          if (tg === prize && burn <= 0){ burn = 0.0001; sfxFire(); }
+          tg.onfire = true;
+          tg.flood = (tg.flood || 0) + .05;
+          tg.sink = Math.min(.9, (tg.sink || 0) + .04);
+          if (tg.flood >= 1) tg.gone = true;       // gone to the bottom
         } else {
           tg.rigDamage = Math.min(1, (tg.rigDamage||0) + .09);
         }
@@ -1107,6 +1116,7 @@ function hud(){
     <div>Left in her hold <b>${hold}</b></div>
     <div class="a">Every chest slows you</div>
     <div class="g">G or C &mdash; cast off and run with your gold</div>
+    <div class="r">SPACE &mdash; pour a broadside into her</div>
     <div class="r">X &mdash; fire her and leave her burning</div>`
     : phase === "escape" ? (() => {
       const threat = consort || prize;

@@ -420,22 +420,34 @@ function drawWakes(){
 // is exactly how these fights were fought when the prize had to float
 // afterward. Reload is honest work; keep your ship laid on her beam.
 const RANGE = 420;
-function gunBearing(){
-  const dx = prize.x - ship.x, dy = prize.y - ship.y;
+function gunBearing(target){
+  const tg = target || prize;
+  const dx = tg.x - ship.x, dy = tg.y - ship.y;
   const rel = norm(Math.atan2(dx, -dy) - ship.hdg);
   const a = Math.abs(rel) * 180/Math.PI;
   const d = Math.hypot(dx, dy);
   // the guns bear only when she is near ABEAM: line up your broadside
-  return { rel, inArc: a > 62 && a < 118, side: rel > 0 ? 1 : -1, d };
+  return { rel, inArc: a > 62 && a < 118, side: rel > 0 ? 1 : -1, d, tg };
+}
+// of all the enemies afloat, the one your broadside can actually hit
+function targetInArc(){
+  let best = null;
+  for (const e of [prize, consort]){
+    if (!e || e.gone) continue;
+    const g = gunBearing(e);
+    if (g.inArc && g.d <= RANGE && (!best || g.d < best.d)) best = g;
+  }
+  return best;
 }
 function fire(){
   if (phase === "over" || phase === "brief" || reload > 0) return;
   reload = 6;
   const c = ship.cls;
   const nG = Math.max(3, Math.floor(c.len / 7));
-  const g = gunBearing();
-  const canHit = g.inArc && g.d <= RANGE;      // only then is she in danger
-  const side = g.inArc ? g.side : (ship.lastSide || 1);  // else fire to starboard
+  const g = targetInArc();                      // prize or consort, whichever bears
+  const canHit = !!g;
+  const tgt = g ? g.tg : null;
+  const side = g ? g.side : (ship.lastSide || 1);
   ship.lastSide = side;
   sfxBroadside(nG);
   // shooting at nothing, the shot carries a long way; close in, hardly any
@@ -454,8 +466,8 @@ function fire(){
     let tx, ty, hit = false;
     if (canHit){
       const spread = (Math.random()-.5) * (g.d * .22 + 18);
-      tx = prize.x + fx * spread * .4 + sx2 * (Math.random()-.5)*26;
-      ty = prize.y + fy * spread * .4 + sy2 * (Math.random()-.5)*26;
+      tx = tgt.x + fx * spread * .4 + sx2 * (Math.random()-.5)*26;
+      ty = tgt.y + fy * spread * .4 + sy2 * (Math.random()-.5)*26;
       hit = Math.random() < Math.max(.18, .8 - g.d / RANGE * .62);
     } else {
       // no one in the arc: the shot just goes out to sea and splashes
@@ -464,7 +476,7 @@ function fire(){
       ty = gy + sy2 * side * r + (Math.random()-.5)*30;
     }
     balls.push({ x: gx, y: gy, tx, ty, t: 0,
-      dur: flight * (.92 + Math.random()*.16), hit });
+      dur: flight * (.92 + Math.random()*.16), hit, target: tgt });
   }
 }
 // SHE FIRES BACK. Historically some of these galleons had their guns
@@ -544,8 +556,17 @@ function combatStep(dt){
     const b = balls[i];
     b.t += dt;
     if (b.t >= b.dur){
+      const tg = b.target || prize;
       if (b.hit){
-        prize.rigDamage = Math.min(1, (prize.rigDamage||0) + .09);
+        if (tg.struck){
+          // a struck ship can still be battered under: round shot floods
+          // her until she settles and goes down
+          tg.flood = (tg.flood || 0) + .06;
+          tg.sink = Math.min(.9, (tg.sink || 0) + .05);
+          if (tg.flood >= 1) tg.gone = true;       // sunk by gunfire
+        } else {
+          tg.rigDamage = Math.min(1, (tg.rigDamage||0) + .09);
+        }
         hits.push({ x: b.tx, y: b.ty, t: 0, mine: true });
         sfxHit();
       } else {
@@ -554,6 +575,11 @@ function combatStep(dt){
       }
       balls.splice(i, 1);
     }
+  }
+  // the Begona can be beaten off too: cut her rig up and she strikes and
+  // falls away, no longer firing
+  if (consort && !consort.struck && (consort.rigDamage||0) >= .75){
+    consort.struck = true; consort.struckAt = env.t;
   }
   for (const sp of splashes) sp.t += dt;
   splashes = splashes.filter(sp => sp.t < .9);
@@ -595,7 +621,11 @@ function spawnConsort(){
   consort.canvas = 1; consort.name = "the Begona"; consort.enemy = true;
 }
 function consortStep(dt){
-  if (!consort) return;
+  if (!consort || consort.gone) return;
+  if (consort.struck){                      // beaten off: she falls astern, guns silent
+    consort.canvas = Math.max(.05, consort.canvas - dt*.3);
+    consort.helm = 0; return;
+  }
   const want = Math.atan2(ship.x - consort.x, -(ship.y - consort.y));
   consort.helm = Math.max(-1, Math.min(1, norm(want - consort.hdg) * 2.5));
   consort.canvas = 1;
@@ -1485,13 +1515,17 @@ function phasesStep(dt){
   const d = Math.hypot(prize.x-ship.x, prize.y-ship.y);
   if (phase === "wait" && d < 1700){ phase = "chase"; }
   if ((phase === "chase" || phase === "struck") && prize.x > CV.ESCAPE_X && !prize.struck) loseCard();
+  if (prize.gone && (phase === "struck" || phase === "board")){
+    ship.warp = null; ship.lines = 0; phase = "escape";
+  }
   if (phase === "board") boardStep(dt);
   if (phase === "escape"){
     // you are away once you have left your pursuer astern: the consort if
     // she came, otherwise the prize herself
-    const threat = consort || prize;
+    const active = consort && !consort.struck && !consort.gone;
+    const threat = active ? consort : prize;
     const dT = Math.hypot(threat.x - ship.x, threat.y - ship.y);
-    if (dT > (consort ? 1300 : 750)) winCard();
+    if (dT > (active ? 1300 : 750)) winCard();
   }
   // beaten off: cut up too badly to go on (in the chase, or by her consort)
   if (phase !== "over" && phase !== "board" && ship.damage > 1.5){
@@ -1571,9 +1605,9 @@ function frame(now){
   drawLand(env.t);
   drawRocks(env.t);
   drawSurf(env.t);
-  if (consort) drawShip(ctx, T, consort, env.t, C);
-  drawShip(ctx, T, prize, env.t, C);
-  if (prize.sink > 0) drawSinking(prize);
+  if (consort && !consort.gone) drawShip(ctx, T, consort, env.t, C);
+  if (!prize.gone) drawShip(ctx, T, prize, env.t, C);
+  if (prize.sink > 0 && !prize.gone) drawSinking(prize);
   drawShip(ctx, T, ship, env.t, C);
   // the grapple lines, and the chest on its way over the rail
   if (phase === "board"){
@@ -1622,6 +1656,7 @@ function frame(now){
 window.__dev = {
   get ship(){ return ship; },
   get prize(){ return prize; },
+  get consort(){ return consort; },
   get env(){ return env; },
   get phase(){ return phase; },
   set phase(p){ phase = p; },

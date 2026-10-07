@@ -249,12 +249,25 @@ Flagged, not hidden. Each is a deliberate choice for play.
    a game where you cannot tack is not a game. The relative ranking, galleon
    worst, is correct.
 
-6. **The flags are wrong for two of the four ships.** `ships.js` draws St
-   George's cross for all four English ships. Right for Drake 1579 and Cavendish
-   1587. Wrong for Rogers 1709, who by the Proclamation of July 1694 should wear
-   a red ensign with union canton and a red jack, and wrong for Anson 1743, whose
-   Centurion should wear a union-canton ensign and, above all, a union broad
-   pendant. Not yet fixed.
+6. ~~**The flags are wrong for two of the four ships.**~~ ✅ **FIXED
+   2026-10-07.** `ships.js` used to draw St George's cross for all four English
+   ships, which is 36 years out of date for Rogers's Duke and 72 for Anson's
+   Centurion. Now:
+   - **george** for Drake 1579 and Cavendish 1587, which was always right.
+   - **redensign** for Rogers 1709 and Anson 1743: a red field with the
+     pre-1801 union in the canton. A privateer's flags were fixed by the
+     Proclamation of July 1694, and the union went into the ensigns in 1707.
+   - **a broad pendant** at the Centurion's main masthead, long and narrow with
+     the union at the hoist. Anson was a commodore and it is the single most
+     characteristic flag his ship wore. No other ship in the game flies one.
+
+   ⚠ Note the title screen `index.html` had this RIGHT all along, with its own
+   `texRedEnsign` and `paintUnion`. It was the in-game ships that were out of
+   step, so this is consistency rather than a new claim.
+
+   ⚠ Still unverified, and no longer asserted in the code comments: whether the
+   Cross of Burgundy is "what Spanish ships wore at sea in all four eras". The
+   game flies it as a reasonable period choice, not as a documented fact.
 
 7. **Time is compressed**, as in doghole. The knots in the HUD are true knots.
    The real chase ran "some 3 or 4 houres" and the real fight five or six.

@@ -34,9 +34,19 @@ export const degOf = r => ((r * 180 / Math.PI) % 360 + 360) % 360;
 // polar: irons = closest she will lie (degrees off the wind), then the
 // curve's anchors at the beam, her best point, and dead run.
 // Colours are daylight wood: wale = the hull sides you see around the
-// deck, deck = the planking, castle = the raised works. flag picks her
-// colours: St George's cross for the English, the Cross of Burgundy
-// for Spain, which is what Spanish ships wore at sea in all four eras.
+// deck, deck = the planking, castle = the raised works.
+// flag picks her colours, and they are NOT all the same:
+//   george     St George's cross. Right for Drake 1579 and Cavendish 1587.
+//   redensign  red field with the pre-1801 union in the canton. Right for
+//              Rogers 1709 (the privateer's flags were fixed by the
+//              Proclamation of July 1694) and for Anson 1743, the union
+//              having been put into the ensigns in 1707. Until 2026-10-07
+//              this game flew St George on all four, which is 36 years out
+//              of date for the Duke and 36 more for the Centurion.
+//   burgundy   the Cross of Burgundy, for Spain.
+// ⚠ The Burgundy cross is a reasonable period choice and it is what the
+// game flies, but "what Spanish ships wore at sea in all four eras" was an
+// unverified claim and should not be repeated as fact. See GAME.md.
 export const CLASSES = {
   goldenhind: {
     // a little Tudor galleon: short, beamy, a tall carrack-like
@@ -47,7 +57,7 @@ export const CLASSES = {
     mass0: 1.0, loadK: 1.05, draft0: 6, cap: 30, hull: 1.0,
     polar: { irons: 55, beam: .82, bestA: 135, best: 1, run: .86 },
     wale: "#3c6b3e", deck: "#caa972", castle: "#2f6b45", castleHi: "#3f8056",
-    paint: "#e8e2d0", accent: "#d9a441", flag: "english",
+    paint: "#e8e2d0", accent: "#d9a441", flag: "george",
   },
   desire: {
     // an Elizabethan race-built ship: leaner than the Hind, a medium
@@ -58,7 +68,7 @@ export const CLASSES = {
     mass0: 1.1, loadK: 1.05, draft0: 6.5, cap: 36, hull: 1.4,
     polar: { irons: 56, beam: .8, bestA: 136, best: 1, run: .87 },
     wale: "#4a2420", deck: "#b89158", castle: "#6e2a28", castleHi: "#8a3733",
-    paint: "#d9a441", accent: "#d9a441", flag: "english",
+    paint: "#d9a441", accent: "#d9a441", flag: "george",
   },
   duke: {
     // a Queen Anne frigate-privateer: long, lean, low and flush, a black
@@ -69,7 +79,7 @@ export const CLASSES = {
     mass0: 1.6, loadK: .9, draft0: 8, cap: 50, hull: 1.9,
     polar: { irons: 58, beam: .78, bestA: 138, best: 1, run: .88 },
     wale: "#201811", deck: "#c6a573", castle: "#5a4428", castleHi: "#6e5533",
-    paint: "#2a2018", accent: "#b98f3a", flag: "english",
+    paint: "#2a2018", accent: "#b98f3a", flag: "redensign",
   },
   centurion: {
     // a 60-gun fourth-rate man-of-war: long, broad and high-sided, TWO
@@ -80,7 +90,7 @@ export const CLASSES = {
     mass0: 2.4, loadK: .75, draft0: 10.5, cap: 70, hull: 2.4,
     polar: { irons: 60, beam: .76, bestA: 140, best: 1, run: .9 },
     wale: "#1b2740", deck: "#a98f63", castle: "#243a63", castleHi: "#31508a",
-    paint: "#e3c24a", accent: "#e3c24a", flag: "english",
+    paint: "#e3c24a", accent: "#e3c24a", flag: "redensign", pendant: true,
   },
   // the prize. The variants (unarmed and fat, the normal prize, the one
   // you do not touch) come later as overrides on this base; see the
@@ -490,6 +500,30 @@ export function drawShip(ctx, T, s, t, C) {
         ctx.beginPath();
         ctx.moveTo(S(fl*.1), S(-fw*.34)); ctx.lineTo(S(fl*.9), S(fw*.34));
         ctx.moveTo(S(fl*.1), S(fw*.34));  ctx.lineTo(S(fl*.9), S(-fw*.34)); ctx.stroke();
+      } else if (type === "redensign"){
+        // ⭐ Rogers 1709 and Anson 1743 are NOT St George's cross. The union
+        // was put into the ensigns in 1707, and a privateer's flags were
+        // fixed by the Proclamation of July 1694. Red field, pre-1801 union
+        // in the canton: St Andrew's white saltire on blue, St George's red
+        // cross fimbriated white over it. See GAME.md.
+        ctx.fillStyle = "#b8342a"; ctx.fillRect(0, S(-fw/2), S(fl), S(fw));
+        const cw = S(fl*.5), ch = S(fw*.5), cy = S(-fw/2);
+        ctx.fillStyle = "#1f3566"; ctx.fillRect(0, cy, cw, ch);
+        ctx.save();
+        ctx.beginPath(); ctx.rect(0, cy, cw, ch); ctx.clip();
+        ctx.strokeStyle = "#f4f0e6"; ctx.lineWidth = Math.max(.7, S(.30));
+        ctx.beginPath();
+        ctx.moveTo(0, cy); ctx.lineTo(cw, cy+ch);
+        ctx.moveTo(0, cy+ch); ctx.lineTo(cw, cy); ctx.stroke();
+        ctx.strokeStyle = "#f4f0e6"; ctx.lineWidth = Math.max(1, S(.52));
+        ctx.beginPath();
+        ctx.moveTo(0, cy+ch/2); ctx.lineTo(cw, cy+ch/2);
+        ctx.moveTo(cw/2, cy); ctx.lineTo(cw/2, cy+ch); ctx.stroke();
+        ctx.strokeStyle = "#c03a2a"; ctx.lineWidth = Math.max(.6, S(.28));
+        ctx.beginPath();
+        ctx.moveTo(0, cy+ch/2); ctx.lineTo(cw, cy+ch/2);
+        ctx.moveTo(cw/2, cy); ctx.lineTo(cw/2, cy+ch); ctx.stroke();
+        ctx.restore();
       } else if (type === "george"){
         ctx.fillStyle = "#f4f0e6"; ctx.fillRect(0, S(-fw/2), S(fl), S(fw));
         ctx.strokeStyle = "#c03a2a"; ctx.lineWidth = Math.max(1, S(.45));
@@ -503,11 +537,33 @@ export function drawShip(ctx, T, s, t, C) {
       ctx.strokeRect(0, S(-fw/2), S(fl), S(fw));
       ctx.restore();
     };
+    // ---- the BROAD PENDANT at the main masthead. Anson was a commodore,
+    //      and this is the single most characteristic flag his ship wore:
+    //      a long narrow streamer, union at the hoist, red in the fly. No
+    //      ship that is not a commodore's flies one.
+    if (c.pendant && !s.struck){
+      const pl = L * .40, pw = Math.max(1.2, S(L * .030));
+      ctx.save();
+      ctx.translate(0, S(-L * .02));            // about the main mast
+      ctx.rotate(a);
+      const hoist = S(pl * .18);
+      ctx.fillStyle = "#1f3566"; ctx.fillRect(0, -pw/2, hoist, pw);
+      ctx.strokeStyle = "#f4f0e6"; ctx.lineWidth = Math.max(.5, pw * .22);
+      ctx.beginPath();
+      ctx.moveTo(0, -pw/2); ctx.lineTo(hoist, pw/2);
+      ctx.moveTo(0, pw/2);  ctx.lineTo(hoist, -pw/2); ctx.stroke();
+      ctx.fillStyle = "#b8342a";                 // the fly, tapering away
+      ctx.beginPath();
+      ctx.moveTo(hoist, -pw/2); ctx.lineTo(S(pl), -pw*.12);
+      ctx.lineTo(S(pl), pw*.12); ctx.lineTo(hoist, pw/2);
+      ctx.closePath(); ctx.fill();
+      ctx.restore();
+    }
     if (!s.struck){
-      flag(fl0, c.flag === "burgundy" ? "burgundy" : "george");
+      flag(fl0, c.flag);
     } else {
       // the national colours coming down, the white going up
-      flag(fl0 * (1 - low), c.flag === "burgundy" ? "burgundy" : "george");
+      flag(fl0 * (1 - low), c.flag);
       flag(fl0 * Math.max(0, (low - .35) / .65), "white");
       // the struck ensign bundled at the staff foot
       if (low > .6){

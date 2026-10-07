@@ -10,6 +10,22 @@ fires at 45 yd. Next = the Cabo shore (`cape.js`), then chain shot and
 the gun phase. Decisions locked with Aodhan 2026-10-03:
 **four captains · era levels · manual broadsides · Acapulco finale.**
 
+## ⭐ THE RULE THAT OVERRIDES THIS DOCUMENT (Aodhan, 2026-10-07)
+
+**The fun is number one. The story is number two.** This plan does not get
+to make the game worse in the name of the record.
+
+Two things follow, and they are not negotiable:
+1. **Every ship always fires back.** A prize that cannot shoot is not a
+   fight, it is a turkey shoot. Any level design in this document that
+   turns the guns off is void.
+2. Where the record and the fun disagree, the fun wins and the departure
+   gets flagged in GAME.md, the way doghole flags its entrance buoys.
+
+The record is still worth having: it is where the texture, the names, the
+numbers and the best ideas come from. It is a source of material, not a
+constraint on design.
+
 The engine is DOGHOLE (`~/doghole/`), reused heavily by agreement. Copy,
 never modify, the doghole repo. Same look: top-down flat vector, hard
 edges, canvas 2D, ES modules, no dependencies.
@@ -50,12 +66,27 @@ until you show your hand. One broadside, grapple, board, done.
 ### 2 · CAVENDISH, *Desire*, 1587 — "The Santa Ana" (the classic ambush)
 The real Cabo San Lucas action and the core level: wait at the cape,
 sight, chase, battle, board, loot, burn her, get out. The *Santa Ana*
-was huge and rich and — I believe, VERIFY against the accounts before
-this goes in a sourcing table — had her great guns struck below for
-cargo: she cannot batter you, but she is full of men. She repelled
-Cavendish's boarders twice; he stood off and pounded her for hours until
-she struck. So: board too early and you are thrown back with crew
-losses; soften her first.
+was huge and rich, and **she shoots back**, like every Spaniard in this
+game.
+
+⛔ **STRUCK 2026-10-07.** This section used to say her great guns were
+struck below for cargo so she could not batter you. Two separate reasons
+that is gone: it is not fun, and it was never sourced. Francis Pretty,
+the eyewitness, never mentions her armament at all. What he describes is
+her people holding the boarders off with "lances, javelings, rapiers, &
+targets, & an innumerable sort of great stones". The unarmed galleon was
+this plan's invention, written from memory before any source was fetched.
+
+What Pretty DOES give us, and what the level should use:
+- The fight ran "within 5 or 6 houres", after a chase of "some 3 or 4 houres".
+- She was "thought to be 700 tunnes in burthen".
+- Boarders repelled ONCE, not twice, then two more gunnery encounters.
+- Your boarding party is tiny: "not past 50 or 60 men at the uttermost".
+- The loot lesson, exactly: he burned her with "500 tunnes of goods in
+  her" because he could not carry it.
+
+So: board too early and you are thrown back with crew losses; soften her
+first. Same lesson, and now she can hurt you while you do it.
 - Ship: the balanced one. Special: the second grapple attempt is
   cheaper (he kept coming).
 - The loot lesson: Cavendish could not carry a fraction of what she
@@ -99,7 +130,7 @@ Unlocked by finishing the four eras; playable with any captain.
 The three real prizes ARE the variation Aodhan asked for:
 | archetype | model | guns | speed | treasure |
 |---|---|---|---|---|
-| the fat one | *Santa Ana* 1587 | struck below (musketry + boarders only) | slow | immense |
+| the fat one | *Santa Ana* 1587 | armed, and she uses them (see the rule above) | slow | immense |
 | the normal prize | *Encarnación* 1709 | ~20 | middling | good |
 | the one you don't touch | *Begoña* 1709 | 40+ | fair | you'll never see it |
 | the fighter | *Covadonga* 1743 | ~30, fights hard | middling | good |

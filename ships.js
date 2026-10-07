@@ -28,7 +28,9 @@ export const degOf = r => ((r * 180 / Math.PI) % 360 + 360) % 360;
 
 // ------------------------------------------------------------ classes
 // len/beam in yards. sail/kFwd set the top speed, rud the handiness,
-// mass0 the ponderousness, cap the treasure she can stow (in chests).
+// mass0 the ponderousness, cap the treasure she can stow (in chests),
+// hull how much shot she soaks before she bilges (the Hull stat on the
+// captain-select screen, which until 2026-10-07 was decoration only).
 // polar: irons = closest she will lie (degrees off the wind), then the
 // curve's anchors at the beam, her best point, and dead run.
 // Colours are daylight wood: wale = the hull sides you see around the
@@ -42,7 +44,7 @@ export const CLASSES = {
     name: "Golden Hind", captain: "Drake", year: 1579,
     len: 24, beam: 8.2, masts: 3, castles: .78, decks: 1,
     sail: 1.55, kFwd: .057, kLat: 1.05, rud: .118, yawDamp: .95,
-    mass0: 1.0, loadK: 1.05, draft0: 6, cap: 30,
+    mass0: 1.0, loadK: 1.05, draft0: 6, cap: 30, hull: 1.0,
     polar: { irons: 55, beam: .82, bestA: 135, best: 1, run: .86 },
     wale: "#3c6b3e", deck: "#caa972", castle: "#2f6b45", castleHi: "#3f8056",
     paint: "#e8e2d0", accent: "#d9a441", flag: "english",
@@ -53,7 +55,7 @@ export const CLASSES = {
     name: "Desire", captain: "Cavendish", year: 1587,
     len: 28, beam: 7.6, masts: 3, castles: .55, decks: 1,
     sail: 1.52, kFwd: .058, kLat: 1.05, rud: .105, yawDamp: .95,
-    mass0: 1.1, loadK: 1.05, draft0: 6.5, cap: 36,
+    mass0: 1.1, loadK: 1.05, draft0: 6.5, cap: 36, hull: 1.4,
     polar: { irons: 56, beam: .8, bestA: 136, best: 1, run: .87 },
     wale: "#4a2420", deck: "#b89158", castle: "#6e2a28", castleHi: "#8a3733",
     paint: "#d9a441", accent: "#d9a441", flag: "english",
@@ -64,7 +66,7 @@ export const CLASSES = {
     name: "Duke", captain: "Woodes Rogers", year: 1709,
     len: 34, beam: 8.4, masts: 3, castles: .34, decks: 1,
     sail: 1.62, kFwd: .066, kLat: 1.1, rud: .085, yawDamp: 1.0,
-    mass0: 1.6, loadK: .9, draft0: 8, cap: 50,
+    mass0: 1.6, loadK: .9, draft0: 8, cap: 50, hull: 1.9,
     polar: { irons: 58, beam: .78, bestA: 138, best: 1, run: .88 },
     wale: "#201811", deck: "#c6a573", castle: "#5a4428", castleHi: "#6e5533",
     paint: "#2a2018", accent: "#b98f3a", flag: "english",
@@ -75,7 +77,7 @@ export const CLASSES = {
     name: "Centurion", captain: "Anson", year: 1743,
     len: 48, beam: 12.6, masts: 3, castles: .5, decks: 2,
     sail: 1.78, kFwd: .079, kLat: 1.2, rud: .06, yawDamp: 1.15,
-    mass0: 2.4, loadK: .75, draft0: 10.5, cap: 70,
+    mass0: 2.4, loadK: .75, draft0: 10.5, cap: 70, hull: 2.4,
     polar: { irons: 60, beam: .76, bestA: 140, best: 1, run: .9 },
     wale: "#1b2740", deck: "#a98f63", castle: "#243a63", castleHi: "#31508a",
     paint: "#e3c24a", accent: "#e3c24a", flag: "english",

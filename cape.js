@@ -15,9 +15,23 @@
 //    rocks close under the shore.
 //  - DEEP WATER CLOSE TO: a submarine canyon heads almost at the
 //    beach here, so the bank is steep and a galleon can pass close.
-// ⚠ Exact outline, soundings and distances are INVENTED at plausible
-// scale; before any sources table ships, pull the period charts
-// (Anson's 1742 plan of the bay exists) and redraw from them.
+// ⚠ Exact outline and distances are INVENTED at plausible scale.
+// ⛔ CORRECTED 2026-10-07: there is NO Anson plan of this bay. Anson was
+// never at Cape San Lucas; the harbour plan in his Voyage (1748) is
+// plate 31, Chequetan, on the Mexican mainland, and Cabo San Lucas
+// appears nowhere in his printed plate list. See SOURCES-WORKING.md.
+// The period authorities for this anchorage are WRITTEN, not drawn:
+//  - Cavendish's own log, 1587: anchored in 12 fathoms, and "a
+//    Southeast winde is the woorst" (Hakluyt XI).
+//  - Shelvocke, 1726: anchor on the bank on the NORTHERN side in 16 to
+//    8 fathoms, keep off the southern side where the bank "shelves away
+//    very fast" into very deep water; he rode in 13 fathoms, half a
+//    mile offshore, open to the sea from E by N to SE by S.
+// Those three soundings are what the depth field should be built on.
+// ⚠⚠ WHICH BAY IS STILL OPEN: Pretty puts it "within the said cape" and
+// gives it a "faire fresh river"; Shelvocke puts it 2 leagues NE of the
+// cape; modern Bahia San Lucas has no river. Do not redraw until that
+// is settled.
 //
 // UNITS: yards. x east, y south. Origin = the tip of Land's End.
 // =====================================================================
@@ -64,6 +78,31 @@ export const ROCKS = [
   // off the east shore
   { x: 2400, y: -860, r: 12, awash: true, name: "the inshore rock" },
 ];
+
+// ------------------------------------------------------------- THE VIGIA
+// ⭐ The lookout hill, and it is a REAL place with a REAL name: the
+// summit of the ridge between the Pacific beach and San Lucas Bay is
+// marked Vigia on the charts, which is simply Spanish for "lookout"
+// (Findlay has it at 527 ft, the Hydrographic Office at 627; they
+// disagree). Anson, 1748, writing from captured Spanish instructions:
+// "there is besides care taken at Cape St. Lucas to look out for any
+// ship of the enemy, which might be cruising there to intercept her",
+// the shore people signal her with fires, and her captain sends his
+// launch in for "intelligence whether or no there are enemies on the
+// coast" before he will commit. If he is told there are, he does not
+// come on. That is the whole mechanic, and it was waiting in the source.
+// See GAME.md.
+// Placed on the ridge close above the tip rather than far inland, so
+// that the player's run out round the point actually passes under it
+// and the fires are something you SEE go up, not a number on a bar.
+export const VIGIA = { x: 55, y: -210, high: 527 };
+
+// Are you tucked under the land, or showing yourself to his water? The
+// bay east of the ridge is the hiding place. Everything south and west
+// of the point is in his view.
+export function inShelter(x, y) {
+  return x > 180 && y < -180;
+}
 
 // where you lie in wait, inside the bay under the lee of the ridge
 export const AMBUSH = { x: 620, y: -330, hdg: 195 };

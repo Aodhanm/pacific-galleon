@@ -95,6 +95,9 @@ let score = +(localStorage.getItem("pg_plunder") || 0);
 let burn = 0, chestPops = [];                // she is afire; the +1s over your deck
 let birds = [], gullWait = 10 + Math.random()*12;
 let hits = [], damageFlash = 0, shake = 0;    // impact sparks, the red flash, a jolt
+// ⭐ THE VIGIA: the watch on the hill. `seen` is how much of you he has
+// made out, 0 to 1; at 1 the signal fires go up and she will not come on.
+let vigia = { seen: 0, lit: false, litT: 0, smoke: [] };
 const PRIZE_HOLD = 120;                      // chests in her: far more than you can stow
 function reset(){
   env = CV.makeWeather();
@@ -112,6 +115,7 @@ function reset(){
   birds = []; gullWait = 10 + Math.random()*12;
   hits = []; damageFlash = 0; shake = 0;
   consort = null; preload2 = 0; cballs = [];
+  vigia = { seen: 0, lit: false, litT: 0, smoke: [] };
   ship.rigDamage = 0; ship.damage = 0;
 }
 reset();
@@ -420,6 +424,24 @@ function drawWakes(){
 // is exactly how these fights were fought when the prize had to float
 // afterward. Reload is honest work; keep your ship laid on her beam.
 const RANGE = 420;
+// ------------------------------------------------------------ GUNNERY
+// ⭐ FUN FIRST. Aodhan's ruling, 2026-10-07: "the fun is number one,
+// story is number two", and every Spaniard always fires back. Before
+// this block the duel was measured at 12.6 SECONDS and cost the player
+// 5% of her hull: she struck after 9 hits while needing 20 to kill you,
+// a five-to-one asymmetry. These are the knobs. Measure any change with
+// __dev.duel() in the console, which runs the fight headless.
+const GUN = {
+  yourReload:      6,      // seconds between your broadsides
+  yourRigPerHit:  .032,    // your shot into her rig (was .09: she died in 9 hits)
+  strikeAt:       .75,     // rig damage at which a Spaniard strikes
+  herReload:       9,      // her broadside interval, base...
+  herReloadVary:   3,      // ...plus up to this many seconds
+  herHullPerHit:  .075,    // her shot into your hull (you bilge at cls.hull)
+  herRigPerHit:   .035,
+  consortReload:   9, consortReloadVary: 3,
+  consortHullPerHit: .08, consortRigPerHit: .035,
+};
 function gunBearing(target){
   const tg = target || prize;
   const dx = tg.x - ship.x, dy = tg.y - ship.y;
@@ -443,7 +465,7 @@ function targetInArc(){
 }
 function fire(){
   if (phase === "over" || phase === "brief" || reload > 0) return;
-  reload = 6;
+  reload = GUN.yourReload;
   const c = ship.cls;
   const nG = Math.max(3, Math.floor(c.len / 7));
   let g, canHit, tgt, side;
@@ -500,7 +522,7 @@ function prizeGunBearing(){
 function prizeFire(){
   const g = prizeGunBearing();
   if (prize.struck || g.d > RANGE || preload > 0) return;
-  preload = 9 + Math.random()*4;
+  preload = GUN.herReload + Math.random()*GUN.herReloadVary;
   const c = prize.cls;
   const nG = Math.max(4, Math.floor(c.len / 6));
   const fx = Math.sin(prize.hdg), fy = -Math.cos(prize.hdg);
@@ -533,8 +555,8 @@ function combatStep(dt){
     const b = pballs[i]; b.t += dt;
     if (b.t >= b.dur){
       if (b.hit){
-        ship.rigDamage = Math.min(1, (ship.rigDamage||0) + .035);
-        ship.damage += .075;
+        ship.rigDamage = Math.min(1, (ship.rigDamage||0) + GUN.herRigPerHit);
+        ship.damage += GUN.herHullPerHit;
         hits.push({ x: b.tx, y: b.ty, t: 0, mine: false });
         damageFlash = .55; shake = 1;
         sfxHit();
@@ -574,7 +596,7 @@ function combatStep(dt){
           tg.sink = Math.min(.9, (tg.sink || 0) + .04);
           if (tg.flood >= 1) tg.gone = true;       // gone to the bottom
         } else {
-          tg.rigDamage = Math.min(1, (tg.rigDamage||0) + .09);
+          tg.rigDamage = Math.min(1, (tg.rigDamage||0) + GUN.yourRigPerHit);
         }
         hits.push({ x: b.tx, y: b.ty, t: 0, mine: true });
         sfxHit();
@@ -587,7 +609,7 @@ function combatStep(dt){
   }
   // the Begona can be beaten off too: cut her rig up and she strikes and
   // falls away, no longer firing
-  if (consort && !consort.struck && (consort.rigDamage||0) >= .75){
+  if (consort && !consort.struck && (consort.rigDamage||0) >= GUN.strikeAt){
     consort.struck = true; consort.struckAt = env.t;
   }
   for (const sp of splashes) sp.t += dt;
@@ -598,7 +620,7 @@ function combatStep(dt){
   hits = hits.filter(h => h.t < .5);
   damageFlash = Math.max(0, damageFlash - dt);
   shake = Math.max(0, shake - dt*2.4);
-  if (!prize.struck && (prize.rigDamage||0) >= .75){
+  if (!prize.struck && (prize.rigDamage||0) >= GUN.strikeAt){
     prize.struck = true; prize.struckAt = env.t;
     phase = "struck";
     spawnConsort();                   // her consort bears down to save her
@@ -611,8 +633,8 @@ function combatStep(dt){
     const b = cballs[i]; b.t += dt;
     if (b.t >= b.dur){
       if (b.hit){
-        ship.rigDamage = Math.min(1, (ship.rigDamage||0) + .035);
-        ship.damage += .08;
+        ship.rigDamage = Math.min(1, (ship.rigDamage||0) + GUN.consortRigPerHit);
+        ship.damage += GUN.consortHullPerHit;
         hits.push({ x: b.tx, y: b.ty, t: 0, mine: false });
         damageFlash = .55; shake = 1; sfxHit();
       } else { splashes.push({ x: b.tx, y: b.ty, t: 0 }); }
@@ -643,7 +665,7 @@ function consortStep(dt){
   const rel = norm(Math.atan2(dx,-dy) - consort.hdg), a = Math.abs(rel)*180/Math.PI;
   const d = Math.hypot(dx,dy);
   if (!(a>55 && a<125) || d > RANGE || preload2 > 0) return;
-  preload2 = 9 + Math.random()*4;
+  preload2 = GUN.consortReload + Math.random()*GUN.consortReloadVary;
   const c = consort.cls, nG = Math.max(4, Math.floor(c.len/6));
   const fx = Math.sin(consort.hdg), fy = -Math.cos(consort.hdg);
   const sx2 = Math.cos(consort.hdg), sy2 = Math.sin(consort.hdg);
@@ -758,9 +780,18 @@ function prizeStep(dt){
     prize.helm = 0;
     return;
   }
+  // ⭐ WARNED FROM THE HILL. Anson: told there are enemies on the coast,
+  // the captain does not proceed for Cape St. Lucas. She keeps her
+  // offing, runs her easting down well clear of the land, and you have
+  // thrown away the only advantage you had.
+  // ⚠ The waypoint test must use the SHIFTED mark. Testing the unshifted
+  // one leaves her circling a point she is deliberately steering wide of,
+  // the lane never advances, and she never runs out to the escape line.
+  const warned = vigia.lit ? 1150 : 0;
   const tgt = CV.LANE[Math.min(wp, CV.LANE.length-1)];
-  if (Math.hypot(tgt.x - prize.x, tgt.y - prize.y) < 260 && wp < CV.LANE.length-1) wp++;
-  let want = Math.atan2(tgt.x - prize.x, -(tgt.y - prize.y));
+  const aimY = tgt.y + warned;
+  if (Math.hypot(tgt.x - prize.x, aimY - prize.y) < 260 && wp < CV.LANE.length-1) wp++;
+  let want = Math.atan2(tgt.x - prize.x, -(aimY - prize.y));
   if ((prize.rigDamage||0) > .05){
     // hauled at, she edges away from you toward the open sea
     const away = Math.atan2(prize.x - ship.x, -(prize.y - ship.y));
@@ -907,6 +938,7 @@ function sfxWhistle(flight){
 }
 // treasure over the rail: the cash register, cut short
 function sfxChest(){
+  if (!A) return;
   if (cashBuf){
     const s2 = A.createBufferSource(); s2.buffer = cashBuf;
     s2.playbackRate.value = .97 + Math.random()*.08;
@@ -935,11 +967,13 @@ function sfxFire(){
 }
 // shot falling short: the sea closing over it
 function sfxSplash(){
+  if (!A) return;
   playBuf(noiseBuf(.3, t2 => Math.sin(Math.PI*t2)**2), .14, "bandpass", 1150, .9);
   tone("sine", 320, 110, .22, .05);
 }
 // shot striking home: her timbers going
 function sfxHit(){
+  if (!A) return;
   tone("triangle", 150, 60, .2, .16);
   for (let i = 0; i < 3; i++){
     playBuf(noiseBuf(.09, t2 => (1-t2)**2), .12,
@@ -947,11 +981,13 @@ function sfxHit(){
   }
 }
 function sfxSail(up){
+  if (!A) return;
   playBuf(noiseBuf(.7, t2 => Math.sin(Math.PI*t2) * (.6 + .4*Math.sin(t2*38))),
           up ? .05 : .035, "bandpass", up ? 1700 : 1150, .8);
   tone("sine", up ? 420 : 300, up ? 900 : 200, .4, .012);
 }
 function sfxCrash(){
+  if (!A) return;
   playBuf(noiseBuf(1.8, t2 => Math.pow(1-t2, 2.2)), .5, "lowpass", 900);
   tone("sawtooth", 78, 30, 1.2, .4);
   for (let i=0;i<16;i++){
@@ -1023,6 +1059,20 @@ function winCard(){
 function loseCard(){
   phase = "over";
   music("britannia", false);
+  if (vigia.lit){
+    card(`<h1>The fires are lit on the Vigia</h1>
+      <p>The watch on the hill made you out and the signal smoke went up over
+      the cape. She never closed the land at all: she kept her offing and ran
+      her easting down for Acapulco with the whole width of the sea between
+      you.</p>
+      <p class="src">The galleon's captain had standing orders for this. Anson
+      printed them in 1748, from papers taken out of a Spanish prize: the shore
+      people signal her with fires, her launch comes in for word "whether or no
+      there are enemies on the coast", and only if he has nothing to fear is he
+      "directed to proceed for Cape St. Lucas". You gave him something to fear.</p>
+      <div class="go">Enter to lie in wait again</div>`);
+    return;
+  }
   card(`<h1>She is round the cape</h1>
     <p>The galleon has hauled away east for Acapulco with her treasure under
     hatches. A stern chase is a long chase, and this one is over.</p>
@@ -1139,7 +1189,7 @@ function hud(){
     <div>Her rig <b>${prize.struck ? '<span class="g">STRUCK</span>'
          : (prize.rigDamage||0) > .01 ? ((prize.rigDamage*100).toFixed(0) + "% cut up") : "whole"}</b></div>` : "";
   const orders = {
-    wait: "Lie quiet. She is coming down the coast from the north-west; you will raise her topsails first. Work out to the point as she comes on, and do not let the arch rocks have you.",
+    wait: "Lie quiet. She is coming down the coast from the north-west; you will raise her topsails first. There is a watch on the Vigia, the hill above the bay: it is your canvas he sees, and only in open water. Creep out under short sail, and do not let the arch rocks have you.",
     chase: "Run her down and lay her on your beam for the broadside, but mind her own guns: she will fire back. Cut her rig up until she strikes.",
     struck: "She has struck her colours. Close within hail and press G to grapple and board her.",
     board: "The grapnels are in her rail and the chests are coming over. Press G or C to cast off with your gold, or X to fire her and leave her burning. Her consort is coming.",
@@ -1378,7 +1428,7 @@ function drawLabels(){
   if (phase === "brief" || phase === "over") return;
   // you
   label(ship, "H.M.S. " + ship.cls.name,
-        1 - Math.min(1, ship.damage/1.5), false);
+        1 - Math.min(1, ship.damage/(ship.cls.hull||1.5)), false);
   // the prize
   const prizeNote = prize.struck ? "STRUCK" : null;
   label(prize, prize.name || "the galleon",
@@ -1417,6 +1467,141 @@ function drawReloadIcon(){
   }
   ctx.restore();
 }
+// When the fires are lit and the hill is off the screen, put the smoke
+// on the edge in its direction. The player must never miss this.
+function drawVigiaMark(){
+  if (!vigia.lit && phase !== "wait") return;
+  const v = CV.VIGIA;
+  if (onScreenW(v.x, v.y, 60)) return;        // he is drawn properly when in view
+  const sx = T.X(v.x), sy = T.Y(v.y);
+  const m = 44, cx = Math.max(m, Math.min(W-m, sx)), cy = Math.max(m, Math.min(H-m, sy));
+  ctx.save();
+  ctx.textAlign = "center";
+  if (!vigia.lit){
+    // he is only watching: a small cairn pip that warms as he makes you out
+    const k = vigia.seen;
+    ctx.globalAlpha = .45 + k*.5;
+    ctx.fillStyle = "#8a7046";
+    ctx.beginPath();
+    ctx.moveTo(cx-7, cy+5); ctx.lineTo(cx, cy-8); ctx.lineTo(cx+7, cy+5);
+    ctx.closePath(); ctx.fill();
+    if (k > .02){
+      ctx.fillStyle = k > .66 ? "#e8552e" : k > .33 ? "#e3a53c" : "#e8e0c8";
+      ctx.beginPath(); ctx.arc(cx, cy - 11, 1.5 + k*3, 0, Math.PI*2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    ctx.font = "600 9px " + getComputedStyle(document.body).fontFamily;
+    ctx.fillStyle = k > .66 ? "rgba(200,80,44,.95)" : "rgba(104,86,58,.8)";
+    ctx.fillText("VIGIA", cx, cy + 18);
+  } else {
+    const f = vigia.litT, fl = 1 + Math.sin(f*11)*.2;
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, 26*fl);
+    g.addColorStop(0, "rgba(255,230,150,.9)");
+    g.addColorStop(.5, "rgba(236,120,40,.6)");
+    g.addColorStop(1, "rgba(200,60,20,0)");
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(cx, cy, 26*fl, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = "#ffd05b";
+    ctx.beginPath();
+    ctx.moveTo(cx-6, cy+6); ctx.quadraticCurveTo(cx-2, cy-8*fl, cx, cy-14*fl);
+    ctx.quadraticCurveTo(cx+4, cy-7*fl, cx+6, cy+6);
+    ctx.closePath(); ctx.fill();
+    ctx.font = "700 10px " + getComputedStyle(document.body).fontFamily;
+    ctx.fillStyle = "#e8552e";
+    ctx.fillText("THE VIGIA", cx, cy + 22);
+  }
+  ctx.restore();
+}
+
+// The lookout meter. During the ambush this is the thing you are
+// actually playing against, so it gets the middle of the screen.
+function drawVigiaMeter(){
+  const cx = W/2, cy = H - 152, w = 150, h = 7;   // clear of the gun icon below
+  const k = vigia.lit ? 1 : vigia.seen;
+  ctx.save();
+  ctx.textAlign = "center";
+  ctx.font = "700 10px " + getComputedStyle(document.body).fontFamily;
+  ctx.fillStyle = vigia.lit ? "#e8552e" : k > .66 ? "#e3a53c" : "#8fa8b8";
+  ctx.fillText(vigia.lit ? "THE FIRES ARE LIT" : "THE WATCH ON THE VIGIA", cx, cy - 9);
+  ctx.fillStyle = "rgba(19,48,64,.25)";
+  ctx.fillRect(cx - w/2, cy, w, h);
+  ctx.fillStyle = vigia.lit ? "#c8381c" : k > .66 ? "#e8552e" : k > .33 ? "#e3a53c" : "#5bbf7a";
+  ctx.fillRect(cx - w/2, cy, w*k, h);
+  if (!vigia.lit){
+    const open = !CV.inShelter(ship.x, ship.y);
+    ctx.font = "400 10px " + getComputedStyle(document.body).fontFamily;
+    ctx.fillStyle = open ? "#b3703a" : "#4f7f63";
+    ctx.fillText(open ? (ship.canvas > .35 ? "he has your canvas" : "in his water, under bare poles")
+                      : "under the land, out of his view", cx, cy + h + 12);
+  }
+  ctx.restore();
+}
+
+// ⭐ THE VIGIA on its hill: a cairn and a ready-laid pyre, which glows
+// as the watch makes you out and goes up in flame when he is sure.
+function drawVigia(t){
+  const v = CV.VIGIA;
+  if (!onScreenW(v.x, v.y, 420)) return;
+  const x = T.X(v.x), y = T.Y(v.y);
+  // the hill: a shaded mound sitting on the ridge
+  const R0 = T.S(78);
+  const g = ctx.createRadialGradient(x - R0*.3, y - R0*.35, R0*.1, x, y, R0);
+  g.addColorStop(0, "#e4cf9c"); g.addColorStop(1, "rgba(176,152,104,0)");
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.ellipse(x, y, R0, R0*.78, 0, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = "rgba(122,100,66,.5)";
+  ctx.beginPath(); ctx.ellipse(x + R0*.16, y + R0*.14, R0*.5, R0*.36, 0, 0, Math.PI*2); ctx.fill();
+
+  const sc = Math.max(1, T.S(1));
+  // the pyre: a cone of brushwood on a stone cairn
+  ctx.fillStyle = "#6e5a3c";
+  ctx.beginPath();
+  ctx.moveTo(x - 7*sc, y + 4*sc); ctx.lineTo(x, y - 11*sc); ctx.lineTo(x + 7*sc, y + 4*sc);
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle = "#4e4030";
+  ctx.fillRect(x - 9*sc, y + 4*sc, 18*sc, 3.5*sc);
+
+  if (!vigia.lit){
+    // he is watching: the longer he has had of you, the hotter the mark
+    const k = vigia.seen;
+    if (k > .02){
+      ctx.globalAlpha = .25 + k*.65;
+      ctx.fillStyle = k > .66 ? "#e8552e" : k > .33 ? "#e3a53c" : "#e8e0c8";
+      ctx.beginPath(); ctx.arc(x, y - 13*sc, (1.6 + k*3.2)*sc, 0, Math.PI*2); ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+  } else {
+    // the fires are lit
+    const f = vigia.litT;
+    for (const p of vigia.smoke){
+      ctx.globalAlpha = Math.max(0, p.a) * .7;
+      ctx.fillStyle = "#cfc6bb";
+      ctx.beginPath(); ctx.arc(T.X(p.x), T.Y(p.y), T.S(p.r), 0, Math.PI*2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    const fl = 1 + Math.sin(f*11)*.18 + Math.sin(f*23)*.09;
+    const fg = ctx.createRadialGradient(x, y - 14*sc, 0, x, y - 14*sc, 20*sc*fl);
+    fg.addColorStop(0, "rgba(255,238,170,.95)");
+    fg.addColorStop(.45, "rgba(240,130,40,.75)");
+    fg.addColorStop(1, "rgba(200,60,20,0)");
+    ctx.fillStyle = fg;
+    ctx.beginPath(); ctx.arc(x, y - 14*sc, 20*sc*fl, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = "#ffd86b";
+    ctx.beginPath();
+    ctx.moveTo(x - 5*sc, y + 2*sc);
+    ctx.quadraticCurveTo(x - 2*sc, y - 12*sc*fl, x, y - 20*sc*fl);
+    ctx.quadraticCurveTo(x + 3*sc, y - 11*sc*fl, x + 5*sc, y + 2*sc);
+    ctx.closePath(); ctx.fill();
+  }
+  // the name, small, the way the chart has it
+  ctx.textAlign = "center";
+  ctx.font = "600 " + Math.max(8, Math.round(T.S(11))) + "px " +
+             getComputedStyle(document.body).fontFamily;
+  ctx.fillStyle = vigia.lit ? "rgba(190,70,40,.95)" : "rgba(104,86,58,.75)";
+  ctx.fillText("VIGIA", x, y + T.S(30));
+  ctx.textAlign = "left";
+}
+
 function drawRose(){
   const R = Math.min(90, W*.07), cx = W - R - 34, cy = 210 + R;
   ctx.save();
@@ -1520,11 +1705,64 @@ function burnHer(){
   phase = "escape";
 }
 
+// --------------------------------------------------------- THE VIGIA
+// The watch on the hill (CV.VIGIA, and see GAME.md: the hill is really
+// called Lookout, and Anson prints the galleon captain's orders about
+// it). It is your CANVAS he sees, not your hull, and he only sees you
+// in open water. Creep out under bare poles and you can take your time;
+// crack on sail off the point and the fires go up and she hauls off.
+// Get back under the land and take in canvas and the sighting goes cold.
+// Tuned by measurement, not by eye: __dev.vigiaTest() gives the time to
+// be spotted at a given canvas, and the run out to the point takes about
+// eleven seconds in his water. At these rates cracking on full sail gets
+// you there at 8.7 kn with the bar at nine tenths, and creeping out under
+// short sail is safe but leaves you doing 3.8 kn when she commits. That
+// trade IS the ambush.
+const VIG = {
+  rateBase:  .022,   // in his water showing nothing: about three quarters of a minute
+  rateCanvas:.061,   // ...rising to about twelve seconds at full sail
+  coolBase:  .030,
+  coolCalm:  .030,   // cooling is faster the less canvas you show
+};
+function vigiaStep(dt){
+  if (vigia.lit){
+    vigia.litT += dt;
+    // the smoke of the signal fire, going away downwind
+    if (vigia.smoke.length < 40 && Math.random() < dt*9){
+      vigia.smoke.push({ x: CV.VIGIA.x + (Math.random()-.5)*12,
+                         y: CV.VIGIA.y + (Math.random()-.5)*12,
+                         r: 6 + Math.random()*5, a: .75, t: 0 });
+    }
+    const wr = (env.windFrom + 180) * Math.PI/180;
+    for (const p of vigia.smoke){
+      p.t += dt; p.a -= dt*.085; p.r += dt*11;
+      p.x += Math.sin(wr)*dt*26; p.y += -Math.cos(wr)*dt*26;
+    }
+    vigia.smoke = vigia.smoke.filter(p => p.a > 0);
+    return;
+  }
+  if (phase !== "wait") return;        // once she has committed it is too late for him
+  const open = !CV.inShelter(ship.x, ship.y);
+  if (open) vigia.seen = Math.min(1, vigia.seen + dt*(VIG.rateBase + ship.canvas*VIG.rateCanvas));
+  else      vigia.seen = Math.max(0, vigia.seen - dt*(VIG.coolBase + (1-ship.canvas)*VIG.coolCalm));
+  if (vigia.seen >= 1){ vigia.lit = true; vigia.litT = 0; sfxFire(); }
+}
+
 // ------------------------------------------------------------- phases
 function phasesStep(dt){
   const d = Math.hypot(prize.x-ship.x, prize.y-ship.y);
   if (phase === "wait" && d < 1700){ phase = "chase"; }
-  if ((phase === "chase" || phase === "struck") && prize.x > CV.ESCAPE_X && !prize.struck) loseCard();
+  // ⭐ Warned from the hill she never comes within sighting distance at
+  // all, so the ambush would otherwise never end. Give the player a beat
+  // to watch the smoke go up, then let him try the hopeless stern chase.
+  if (vigia.lit && phase === "wait" && vigia.litT > 3.5) phase = "chase";
+  // Warned, she keeps her offing and never closes the land at all. Give
+  // the player twenty seconds to watch her go by out of reach, then call
+  // it: a lost ambush should not cost three minutes of stern chase. If he
+  // somehow does get within sighting distance, he keeps his game.
+  if (vigia.lit && !prize.struck && vigia.litT > 20 && d > 1700) loseCard();
+  if ((phase === "chase" || phase === "struck" || vigia.lit)
+      && prize.x > CV.ESCAPE_X && !prize.struck) loseCard();
   if (prize.gone && (phase === "struck" || phase === "board")){
     ship.warp = null; ship.lines = 0; phase = "escape";
   }
@@ -1538,7 +1776,7 @@ function phasesStep(dt){
     if (dT > (active ? 1300 : 750)) winCard();
   }
   // beaten off: cut up too badly to go on (in the chase, or by her consort)
-  if (phase !== "over" && phase !== "board" && ship.damage > 1.5){
+  if (phase !== "over" && phase !== "board" && ship.damage > (ship.cls.hull||1.5)){
     failCard("She has beaten you off",
       "Their guns cut your rigging and hull to pieces. The Spaniards hold their course for Acapulco while you lie licking your wounds.");
   }
@@ -1601,6 +1839,7 @@ function frame(now){
       }
       lastD = d;
       hazards(dt);
+      vigiaStep(dt);
       phasesStep(dt);
     }
   } catch (err) {
@@ -1613,6 +1852,7 @@ function frame(now){
   drawGlints(env.t);
   drawWakes();
   drawLand(env.t);
+  drawVigia(env.t);
   drawRocks(env.t);
   drawSurf(env.t);
   if (consort && !consort.gone) drawShip(ctx, T, consort, env.t, C);
@@ -1648,6 +1888,8 @@ function frame(now){
   if (phase === "board") drawTreasureInset();
   drawChestPops();
   if (phase !== "brief" && phase !== "over"){ drawSailMark(); drawRose(); drawReloadIcon(); }
+  if (phase === "wait" || vigia.lit) drawVigiaMeter();
+  drawVigiaMark();
   if (damageFlash > 0){
     const a = damageFlash / .55;
     const g2 = ctx.createRadialGradient(W/2, H/2, Math.min(W,H)*.3, W/2, H/2, Math.max(W,H)*.7);
@@ -1668,8 +1910,30 @@ window.__dev = {
   get prize(){ return prize; },
   get consort(){ return consort; },
   get env(){ return env; },
+  // gunnery state, for testing whether she is actually shooting at you
+  get preload(){ return preload; },
+  get reload(){ return reload; },
+  get pballs(){ return pballs; },
+  get cballs(){ return cballs; },
+  get balls(){ return balls; },
   get phase(){ return phase; },
   set phase(p){ phase = p; },
+  get vigia(){ return vigia; },
+  // how long can you lie in the open at a given canvas before the fires go up?
+  vigiaTest(canvas = 1, inOpen = true){
+    reset(); phase = "wait";
+    ship.canvas = canvas;
+    if (inOpen){ ship.x = 60; ship.y = 420; }      // off the point, in his water
+    else { ship.x = CV.AMBUSH.x; ship.y = CV.AMBUSH.y; }
+    let t = 0;
+    while (!vigia.lit && t < 300){
+      ship.canvas = canvas;
+      if (inOpen){ ship.x = 60; ship.y = 420; } else { ship.x = CV.AMBUSH.x; ship.y = CV.AMBUSH.y; }
+      vigiaStep(1/60); t += 1/60;
+    }
+    return { canvas, inOpen, inShelter: CV.inShelter(ship.x, ship.y),
+             secondsToBeSpotted: vigia.lit ? +t.toFixed(1) : null, seen: +vigia.seen.toFixed(2) };
+  },
   put(x, y, hdgDeg, cv2 = 0){
     ship.x = x; ship.y = y; ship.hdg = (hdgDeg||0)*Math.PI/180;
     ship.vx = 0; ship.vy = 0; ship.omega = 0; ship.canvas = cv2;
@@ -1683,6 +1947,33 @@ window.__dev = {
   fire(){ fire(); },
   castOff(){ if (phase === "board") castOff(); },
   auto: null,
+  // ⭐ HEADLESS DUEL TEST. Lays you on her beam at `range` yards and fires
+  // the instant your guns are loaded, with no rAF and no sailing skill
+  // involved, then reports how long she took to strike and what it cost
+  // you. This is how GUN gets tuned: change a number, run __dev.duel().
+  duel(range = 110, maxSec = 300){
+    reset(); phase = "chase";
+    const lay = () => {
+      ship.x = prize.x - Math.cos(prize.hdg) * range;
+      ship.y = prize.y - Math.sin(prize.hdg) * range;
+      ship.hdg = prize.hdg; ship.vx = 0; ship.vy = 0; ship.canvas = 1;
+    };
+    lay();
+    let mine = 0, hers = 0, pl = preload, struckAt = null;
+    for (let f = 1; f <= maxSec * 60; f++){
+      if (f % 20 === 1) lay();          // a gunnery test, not a sailing one
+      if (reload <= 0){ fire(); mine++; }
+      this.tick(1);
+      if (preload > pl) hers++;
+      pl = preload;
+      if (prize.struck){ struckAt = +(f / 60).toFixed(1); break; }
+    }
+    return { range, secondsToMakeHerStrike: struckAt,
+             yourBroadsides: mine, herBroadsides: hers,
+             yourHull: +ship.damage.toFixed(2),
+             yourShareOfDeath: +(ship.damage / (ship.cls.hull||1.5)).toFixed(2),
+             yourRig: +(ship.rigDamage || 0).toFixed(2) };
+  },
   tick(n = 600){
     const h = 1/60;
     for (let i = 0; i < n; i++){
@@ -1696,6 +1987,7 @@ window.__dev = {
       for (let k = 0; k < 7; k++){ step(ship, env, h); step(prize, env, h); if (consort) step(consort, env, h); }
       for (const w of wakes) wakeStep(w, h);
       combatStep(h);
+      vigiaStep(h);
       camUpdate(h);
       lastD = Math.hypot(prize.x-ship.x, prize.y-ship.y);
       phasesStep(h);

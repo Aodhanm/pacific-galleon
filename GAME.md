@@ -87,6 +87,47 @@ minutes, and twelve hits given for every one taken.
 
 ---
 
+## ⭐ Three Spaniards, not one
+
+Built 2026-10-07. Until now every run drew the same galleon with a random name
+painted on her. Now she is one of three real ships, drawn at random, and they
+differ in kind rather than in numbers. You cannot tell which until you close
+her: at over 1250 yards she is just "a sail", inside that you get her trim, and
+inside 560 yards you read her name and her character.
+
+| | Santa Ana, 1587 | Encarnacion, 1709 | Covadonga, 1743 |
+|---|---|---|---|
+| what she is | the fat one | the clean prize | she means to take YOU |
+| guns a side | 4 | 6 | 8 |
+| her reload | 13 to 17s | 9 to 12s | 8 to 11s |
+| punishment she takes | **1.55x** | 0.80x | 1.15x |
+| chests in her | **190** | 105 | 125 |
+
+Measured with `__dev.duel(110)`, six to eight runs a cell. Win rate, length of
+the duel, and how much of your hull it costs:
+
+| | Santa Ana | Encarnacion | Covadonga |
+|---|---|---|---|
+| **Golden Hind** (hull 1.0) | 6/6 · 114s · 50% | 5/6 · 58s · 80% | **0/6** |
+| **Desire** (1.4) | 6/6 · 83s · 30% | 6/6 · 42s · 40% | 4/6 · 64s · 70% |
+| **Duke** (1.9) | 6/6 · 86s · 20% | 6/6 · 44s · 30% | 6/6 · 62s · 70% |
+
+Drake's little 1579 ship can batter down the fat slow one over nearly two
+minutes, and cannot touch the 1743 fighter at all. That is as it should be.
+
+⭐ **The loot lesson lands hardest on the Santa Ana**: you fill your 36 chests
+and leave **154** in her. That is Cavendish's "500 tunnes of goods in her", in
+the mechanics.
+
+⚠ A bug this found, worth remembering: rig damage was capped at 1.0 while the
+Santa Ana's strike threshold is 0.75 x 1.55 = **1.16**. She was literally
+unbeatable and won eight duels out of eight before the cap was raised. Any
+future `rig` above 1.33 would have done the same thing silently.
+
+Force one for testing with `__dev.setPrize("covadonga")`.
+
+---
+
 ## ⭐ The ambush: the watch on the Vigia
 
 Built 2026-10-07. Before this the wait phase had no teeth at all: the HUD told

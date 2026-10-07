@@ -125,7 +125,7 @@ arc. No English captain ever did this — it is the game's one declared
 departure, flagged in-game the way doghole flags its entrance buoys.
 Unlocked by finishing the four eras; playable with any captain.
 
-## The galleon spawn table (for replay / freeplay later)
+## The galleon spawn table ✅ BUILT 2026-10-07 (see GAME.md for measured numbers)
 
 The three real prizes ARE the variation Aodhan asked for:
 | archetype | model | guns | speed | treasure |

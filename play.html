@@ -89,8 +89,38 @@ let closure = 0, lastD = null, sailT = 0;
 let hold = 0, chestT = 0, chestFly = null;   // what is left in her, the transfer
 let preload = 0, pballs = [];                // HER guns, firing back at you
 let consort = null, preload2 = 0, cballs = [];   // the second Spaniard (the Begona)
-const GAL_NAMES = ["Nuestra Senora de Covadonga","Santa Ana","Encarnacion",
-                   "Rosario","Santisima Trinidad","Pilar"];
+// ⭐ THE PRIZE IS NOT ALWAYS THE SAME SHIP. Three real galleons, three
+// real fights, drawn at random. Reading WHICH of them is coming down on
+// you before you are committed is the skill (PLAN.md's spawn table).
+// Every one of them shoots back: see the rule in PLAN.md.
+// The three are meant to feel different in KIND, not just in numbers:
+//   Santa Ana    feeble guns, an enormous tough hull, an age to batter
+//                down, and more treasure than you could ever stow
+//   Encarnacion  a short sharp fight and a modest payload: the clean prize
+//   Covadonga    she means to take YOU. Wins the exchange rate, and leaves
+//                you half dead with her consort still to come.
+//   lenK   her size against the base galleon
+//   guns   how many she fires a side
+//   reload [base, vary] seconds
+//   acc    her chance of a hit at point blank, falling off with range
+//   rig    how much punishment she takes before she strikes (x GUN.strikeAt)
+//   hold   chests in her, against your capacity of 30 to 70
+//   speedK her legs
+const PRIZES = [
+  { key: "santaana", name: "Santa Ana", year: 1587, tons: 700,
+    lenK: 1.10, guns: 4, reload: [13, 4], acc: .30, rig: 1.55, hold: 190, speedK: .90,
+    far:  "a great ship, and very deep in the water",
+    near: "She is enormous and she swims low. Her ports are few and her people are many." },
+  { key: "encarnacion", name: "Encarnacion", year: 1709, tons: 400,
+    lenK: .90, guns: 6, reload: [9, 3], acc: .40, rig: .80, hold: 105, speedK: 1.03,
+    far:  "a middling ship, handier than most",
+    near: "A middling galleon with her ports open. She will fight, but not for long." },
+  { key: "covadonga", name: "Nuestra Senora de Covadonga", year: 1743, tons: 700,
+    lenK: 1.0, guns: 8, reload: [8, 3], acc: .37, rig: 1.15, hold: 125, speedK: .98,
+    far:  "a heavy ship, and she is not running",
+    near: "Her guns are run out and she is coming to meet you. This one means to take YOU." },
+];
+let forcePrize = null;                       // __dev.setPrize() for testing
 let score = +(localStorage.getItem("pg_plunder") || 0);
 let burn = 0, chestPops = [];                // she is afire; the +1s over your deck
 let birds = [], gullWait = 10 + Math.random()*12;
@@ -98,19 +128,26 @@ let hits = [], damageFlash = 0, shake = 0;    // impact sparks, the red flash, a
 // ⭐ THE VIGIA: the watch on the hill. `seen` is how much of you he has
 // made out, 0 to 1; at 1 the signal fires go up and she will not come on.
 let vigia = { seen: 0, lit: false, litT: 0, smoke: [] };
-const PRIZE_HOLD = 120;                      // chests in her: far more than you can stow
+// her hold is per-ship now; see PRIZES above
 function reset(){
   env = CV.makeWeather();
   ship = makeShip(shipKey, CV.AMBUSH.x, CV.AMBUSH.y, CV.AMBUSH.hdg);
   ship.canvas = .15;
   prize = makeShip("galleon", CV.LANE[2].x, CV.LANE[2].y, 110);
   prize.canvas = 1; prize.sink = 0;
-  prize.name = GAL_NAMES[(Math.random()*GAL_NAMES.length)|0];
+  const arch = forcePrize || PRIZES[(Math.random()*PRIZES.length)|0];
+  prize.arch = arch;
+  prize.name = arch.name;
+  // a COPY of the class, never the shared one, or the override leaks into
+  // every later game
+  const gc = prize.cls;
+  prize.cls = { ...gc, len: gc.len*arch.lenK, beam: gc.beam*arch.lenK,
+                kFwd: gc.kFwd*arch.speedK, cap: 0 };
   wp = 3;
   phase = "brief"; elapsed = 0;
   reload = 0; smoke = []; balls = []; splashes = [];
   lastD = null; closure = 0;
-  hold = PRIZE_HOLD; chestT = 0; chestFly = null;
+  hold = prize.arch.hold; chestT = 0; chestFly = null;
   preload = 3; pballs = []; burn = 0; chestPops = [];
   birds = []; gullWait = 10 + Math.random()*12;
   hits = []; damageFlash = 0; shake = 0;
@@ -424,6 +461,7 @@ function drawWakes(){
 // is exactly how these fights were fought when the prize had to float
 // afterward. Reload is honest work; keep your ship laid on her beam.
 const RANGE = 420;
+const strikeLimit = () => GUN.strikeAt * (prize.arch ? prize.arch.rig : 1);
 // ------------------------------------------------------------ GUNNERY
 // ⭐ FUN FIRST. Aodhan's ruling, 2026-10-07: "the fun is number one,
 // story is number two", and every Spaniard always fires back. Before
@@ -522,9 +560,10 @@ function prizeGunBearing(){
 function prizeFire(){
   const g = prizeGunBearing();
   if (prize.struck || g.d > RANGE || preload > 0) return;
-  preload = GUN.herReload + Math.random()*GUN.herReloadVary;
+  const A2 = prize.arch;
+  preload = A2.reload[0] + Math.random()*A2.reload[1];
   const c = prize.cls;
-  const nG = Math.max(4, Math.floor(c.len / 6));
+  const nG = A2.guns;
   const fx = Math.sin(prize.hdg), fy = -Math.cos(prize.hdg);
   const sx2 = Math.cos(prize.hdg), sy2 = Math.sin(prize.hdg);
   sfxBroadside(nG);
@@ -541,7 +580,7 @@ function prizeFire(){
     pballs.push({ x: gx, y: gy, tx: ship.x + fx*spread*.4 + sx2*(Math.random()-.5)*26,
       ty: ship.y + fy*spread*.4 + sy2*(Math.random()-.5)*26, t: 0,
       dur: .28 + g.d/RANGE*.3,
-      hit: Math.random() < Math.max(.1, .42 - g.d/RANGE*.34) });
+      hit: Math.random() < Math.max(.08, A2.acc - g.d/RANGE*(A2.acc*.8)) });
   }
 }
 
@@ -596,7 +635,11 @@ function combatStep(dt){
           tg.sink = Math.min(.9, (tg.sink || 0) + .04);
           if (tg.flood >= 1) tg.gone = true;       // gone to the bottom
         } else {
-          tg.rigDamage = Math.min(1, (tg.rigDamage||0) + GUN.yourRigPerHit);
+          // ⚠ cap must sit ABOVE the toughest Spaniard's strike threshold
+          // (GUN.strikeAt * her rig). Capping at 1 made anything over rig
+          // 1.33 literally unbeatable: the Santa Ana won 8 duels out of 8
+          // because her threshold was 1.16 and her damage stopped at 1.00.
+          tg.rigDamage = Math.min(2.5, (tg.rigDamage||0) + GUN.yourRigPerHit);
         }
         hits.push({ x: b.tx, y: b.ty, t: 0, mine: true });
         sfxHit();
@@ -620,7 +663,7 @@ function combatStep(dt){
   hits = hits.filter(h => h.t < .5);
   damageFlash = Math.max(0, damageFlash - dt);
   shake = Math.max(0, shake - dt*2.4);
-  if (!prize.struck && (prize.rigDamage||0) >= GUN.strikeAt){
+  if (!prize.struck && (prize.rigDamage||0) >= GUN.strikeAt * (prize.arch ? prize.arch.rig : 1)){
     prize.struck = true; prize.struckAt = env.t;
     phase = "struck";
     spawnConsort();                   // her consort bears down to save her
@@ -1182,15 +1225,19 @@ function hud(){
     <div>${d < 55 ? '<span class="g">G &mdash; grapple and board</span>' : '<span class="a">Close alongside to board</span>'}</div>
     ${consort ? '<div class="r">A sail to windward: her consort!</div>' : ""}`
     : (phase !== "brief" && phase !== "over") ? `
-    <div>The galleon <b>${pts(brg)}</b>, <b>${d < 1000 ? Math.round(d) + " yd" : (d/CV.YD_PER_NM).toFixed(1) + " nm"}</b></div>
+    <div>${d > 1250 ? "A sail" : prize.identified ? prize.name : "The galleon"} <b>${pts(brg)}</b>, <b>${d < 1000 ? Math.round(d) + " yd" : (d/CV.YD_PER_NM).toFixed(1) + " nm"}</b></div>
+    ${d <= 1250 && !prize.identified ? `<div class="a">${prize.arch.far}</div>` : ""}
     <div>${closure > .05 ? `<span class="g">Closing, ${closure.toFixed(1)} kn</span>`
          : closure < -.05 ? `<span class="r">Stretching away, ${(-closure).toFixed(1)} kn</span>`
          : "Holding her own"}</div>
     <div>Her rig <b>${prize.struck ? '<span class="g">STRUCK</span>'
-         : (prize.rigDamage||0) > .01 ? ((prize.rigDamage*100).toFixed(0) + "% cut up") : "whole"}</b></div>` : "";
+         : (prize.rigDamage||0) > .01
+           ? (Math.min(99, (prize.rigDamage/strikeLimit())*100).toFixed(0) + "% cut up")
+           : "whole"}</b></div>` : "";
   const orders = {
     wait: "Lie quiet. She is coming down the coast from the north-west; you will raise her topsails first. There is a watch on the Vigia, the hill above the bay: it is your canvas he sees, and only in open water. Creep out under short sail, and do not let the arch rocks have you.",
-    chase: "Run her down and lay her on your beam for the broadside, but mind her own guns: she will fire back. Cut her rig up until she strikes.",
+    chase: "Run her down and lay her on your beam for the broadside, but mind her own guns: she will fire back. Cut her rig up until she strikes."
+         + (prize.identified ? "  " + prize.arch.near : ""),
     struck: "She has struck her colours. Close within hail and press G to grapple and board her.",
     board: "The grapnels are in her rail and the chests are coming over. Press G or C to cast off with your gold, or X to fire her and leave her burning. Her consort is coming.",
     escape: "Cast off and get clear, heavy as she is. Make for the open sea.",
@@ -1431,8 +1478,8 @@ function drawLabels(){
         1 - Math.min(1, ship.damage/(ship.cls.hull||1.5)), false);
   // the prize
   const prizeNote = prize.struck ? "STRUCK" : null;
-  label(prize, prize.name || "the galleon",
-        1 - Math.min(1, (prize.rigDamage||0)/.75), true, prizeNote);
+  label(prize, prize.identified ? prize.name : "a Spaniard",
+        1 - Math.min(1, (prize.rigDamage||0)/strikeLimit()), true, prizeNote);
   // her consort
   if (consort) label(consort, consort.name || "the consort", 1, true);
 }
@@ -1751,6 +1798,8 @@ function vigiaStep(dt){
 // ------------------------------------------------------------- phases
 function phasesStep(dt){
   const d = Math.hypot(prize.x-ship.x, prize.y-ship.y);
+  // near enough to count her ports and read her trim
+  if (!prize.identified && d < 560 && !prize.gone){ prize.identified = true; }
   if (phase === "wait" && d < 1700){ phase = "chase"; }
   // ⭐ Warned from the hill she never comes within sighting distance at
   // all, so the ambush would otherwise never end. Give the player a beat
@@ -1919,6 +1968,9 @@ window.__dev = {
   get phase(){ return phase; },
   set phase(p){ phase = p; },
   get vigia(){ return vigia; },
+  get prizes(){ return PRIZES; },
+  // force a given Spaniard for testing: __dev.setPrize("covadonga")
+  setPrize(key){ forcePrize = PRIZES.find(p2 => p2.key === key) || null; reset(); return prize.arch.name; },
   // how long can you lie in the open at a given canvas before the fires go up?
   vigiaTest(canvas = 1, inOpen = true){
     reset(); phase = "wait";
@@ -1959,16 +2011,21 @@ window.__dev = {
       ship.hdg = prize.hdg; ship.vx = 0; ship.vy = 0; ship.canvas = 1;
     };
     lay();
-    let mine = 0, hers = 0, pl = preload, struckAt = null;
+    let mine = 0, hers = 0, pl = preload, struckAt = null, killedAt = null;
     for (let f = 1; f <= maxSec * 60; f++){
       if (f % 20 === 1) lay();          // a gunnery test, not a sailing one
-      if (reload <= 0){ fire(); mine++; }
+      if (reload <= 0 && phase !== "over"){ fire(); mine++; }
       this.tick(1);
       if (preload > pl) hers++;
       pl = preload;
       if (prize.struck){ struckAt = +(f / 60).toFixed(1); break; }
+      // ⚠ she can win. Stop, or fire() early-returns on the "over" phase,
+      // reload never resets, and the harness logs thousands of broadsides.
+      if (phase === "over"){ killedAt = +(f / 60).toFixed(1); break; }
     }
-    return { range, secondsToMakeHerStrike: struckAt,
+    return { prize: prize.arch ? prize.arch.name : "the galleon",
+             range, secondsToMakeHerStrike: struckAt,
+             SHE_BEAT_YOU_AT: killedAt,
              yourBroadsides: mine, herBroadsides: hers,
              yourHull: +ship.damage.toFixed(2),
              yourShareOfDeath: +(ship.damage / (ship.cls.hull||1.5)).toFixed(2),

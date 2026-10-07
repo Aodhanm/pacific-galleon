@@ -30,7 +30,17 @@ export const degOf = r => ((r * 180 / Math.PI) % 360 + 360) % 360;
 // len/beam in yards. sail/kFwd set the top speed, rud the handiness,
 // mass0 the ponderousness, cap the treasure she can stow (in chests),
 // hull how much shot she soaks before she bilges (the Hull stat on the
-// captain-select screen, which until 2026-10-07 was decoration only).
+// captain-select screen, which until 2026-10-07 was decoration only),
+// targetK how big a mark she makes: a Spaniard's gunners hit a 24-yard
+// Tudor galleon far less often than a 48-yard two-decker, which is how
+// the smallest ship survives without pretending to a stout hull,
+// lootK how fast the chests come over her rail (Drake's people were the
+// best boarders in the game and PLAN.md always said so),
+// watch whether the shore lookout at the Vigia is keeping a watch for HER
+// era. ⭐ Aodhan's call 2026-10-07: only Rogers 1709 and Anson 1743.
+// It also fits the record better than having it always on: the cape's
+// signal-and-refreshment system was ordered by the viceroy only AFTER
+// 1734, so it has no business existing for Drake in 1579.
 // polar: irons = closest she will lie (degrees off the wind), then the
 // curve's anchors at the beam, her best point, and dead run.
 // Colours are daylight wood: wale = the hull sides you see around the
@@ -55,6 +65,7 @@ export const CLASSES = {
     len: 24, beam: 8.2, masts: 3, castles: .78, decks: 1,
     sail: 1.55, kFwd: .057, kLat: 1.05, rud: .118, yawDamp: .95,
     mass0: 1.0, loadK: 1.05, draft0: 6, cap: 30, hull: 1.0,
+    targetK: .60, lootK: 1.5, watch: false,
     polar: { irons: 55, beam: .82, bestA: 135, best: 1, run: .86 },
     wale: "#3c6b3e", deck: "#caa972", castle: "#2f6b45", castleHi: "#3f8056",
     paint: "#e8e2d0", accent: "#d9a441", flag: "george",
@@ -66,6 +77,7 @@ export const CLASSES = {
     len: 28, beam: 7.6, masts: 3, castles: .55, decks: 1,
     sail: 1.52, kFwd: .058, kLat: 1.05, rud: .105, yawDamp: .95,
     mass0: 1.1, loadK: 1.05, draft0: 6.5, cap: 36, hull: 1.4,
+    targetK: .74, lootK: 1.15, watch: false,
     polar: { irons: 56, beam: .8, bestA: 136, best: 1, run: .87 },
     wale: "#4a2420", deck: "#b89158", castle: "#6e2a28", castleHi: "#8a3733",
     paint: "#d9a441", accent: "#d9a441", flag: "george",
@@ -77,6 +89,7 @@ export const CLASSES = {
     len: 34, beam: 8.4, masts: 3, castles: .34, decks: 1,
     sail: 1.62, kFwd: .066, kLat: 1.1, rud: .085, yawDamp: 1.0,
     mass0: 1.6, loadK: .9, draft0: 8, cap: 50, hull: 1.9,
+    targetK: .88, lootK: 1.0, watch: true,
     polar: { irons: 58, beam: .78, bestA: 138, best: 1, run: .88 },
     wale: "#201811", deck: "#c6a573", castle: "#5a4428", castleHi: "#6e5533",
     paint: "#2a2018", accent: "#b98f3a", flag: "redensign",
@@ -88,6 +101,7 @@ export const CLASSES = {
     len: 48, beam: 12.6, masts: 3, castles: .5, decks: 2,
     sail: 1.78, kFwd: .079, kLat: 1.2, rud: .06, yawDamp: 1.15,
     mass0: 2.4, loadK: .75, draft0: 10.5, cap: 70, hull: 2.4,
+    targetK: 1.0, lootK: .85, watch: true,
     polar: { irons: 60, beam: .76, bestA: 140, best: 1, run: .9 },
     wale: "#1b2740", deck: "#a98f63", castle: "#243a63", castleHi: "#31508a",
     paint: "#e3c24a", accent: "#e3c24a", flag: "redensign", pendant: true,

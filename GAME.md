@@ -106,14 +106,29 @@ inside 560 yards you read her name and her character.
 Measured with `__dev.duel(110)`, six to eight runs a cell. Win rate, length of
 the duel, and how much of your hull it costs:
 
+Re-measured 2026-10-07 after Drake's ship was made survivable (see below):
+
 | | Santa Ana | Encarnacion | Covadonga |
 |---|---|---|---|
-| **Golden Hind** (hull 1.0) | 6/6 · 114s · 50% | 5/6 · 58s · 80% | **0/6** |
-| **Desire** (1.4) | 6/6 · 83s · 30% | 6/6 · 42s · 40% | 4/6 · 64s · 70% |
-| **Duke** (1.9) | 6/6 · 86s · 20% | 6/6 · 44s · 30% | 6/6 · 62s · 70% |
+| **Golden Hind** 1579 | 8/8 · 103s · 28% | 8/8 · 54s · 49% | 6/8 · 81s · 71% |
+| **Desire** 1587 | 6/6 · 77s · 16% | 6/6 · 44s · 33% | 6/6 · 55s · 55% |
+| **Duke** 1709 | 6/6 · 85s · 15% | 6/6 · 37s · 32% | 6/6 · 61s · 57% |
+| **Centurion** 1743 | 6/6 · 60s · 11% | 6/6 · 25s · 15% | 6/6 · 39s · 35% |
 
-Drake's little 1579 ship can batter down the fat slow one over nearly two
-minutes, and cannot touch the 1743 fighter at all. That is as it should be.
+### Drake's ship was too hard, and the fix is not a stouter hull
+It lost to the Covadonga **six times out of six** and cost 80% of its hull
+against the Encarnacion. Raising its hull would have made the captain screen
+lie again, since the Golden Hind is advertised at Hull 2 of 5.
+
+Instead every class now carries a **`targetK`**: how big a mark she makes. A
+Spanish gun crew hits a 24-yard Tudor galleon far less often than a 48-yard
+two-decker, so the small ship survives by being small, not by pretending to be
+stout. Golden Hind .60, Desire .74, Duke .88, Centurion 1.0.
+
+And **`lootK`**: Drake's people were the best boarders in the game, which
+PLAN.md always said and nothing implemented. The chests come over his rail at
+1.5x, which shortens his time alongside and so buys him a longer head start on
+the Begona.
 
 ⭐ **The loot lesson lands hardest on the Santa Ana**: you fill your 36 chests
 and leave **154** in her. That is Cavendish's "500 tunnes of goods in her", in
@@ -145,6 +160,17 @@ Spanish papers:
 and the captain is to send his launch ashore with twenty armed men to bring back
 "intelligence whether or no there are enemies on the coast". Only if he has
 nothing to fear is he "directed to proceed for Cape St. Lucas".
+
+⭐ **ONLY ROGERS 1709 AND ANSON 1743 FACE HIM.** Aodhan's call, 2026-10-07, and
+it fits the record better than having the watch always on: Schurz has the
+viceroy ordering the cape's signal-and-refreshment system only **after 1734**,
+when Montero's galleon came in to Bahia San Bernabe with one day's water left.
+So there is nobody on the hill in Drake's day or Cavendish's, and the ambush
+orders say so. The hill is not drawn as a manned post, and no meter appears.
+
+This also gives the four captains a real era ramp, which the game did not have
+before: the early captains have the weakest ships and an empty shore, and the
+late ones have the best ships and a shore that is watching them.
 
 **How it plays.** It is your CANVAS he sees, not your hull, and he only sees you
 in open water. The bay east of the ridge is dead ground. Fill the bar and the

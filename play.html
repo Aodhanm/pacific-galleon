@@ -609,7 +609,7 @@ function prizeFire(){
     pballs.push({ x: gx, y: gy, tx: ship.x + fx*spread*.4 + sx2*(Math.random()-.5)*26,
       ty: ship.y + fy*spread*.4 + sy2*(Math.random()-.5)*26, t: 0,
       dur: .28 + g.d/RANGE*.3,
-      hit: Math.random() < Math.max(.08, A2.acc - g.d/RANGE*(A2.acc*.8)) });
+      hit: Math.random() < Math.max(.08, A2.acc - g.d/RANGE*(A2.acc*.8)) * (ship.cls.targetK ?? 1) });
   }
 }
 
@@ -762,7 +762,7 @@ function consortStep(dt){
     cballs.push({ x:gx, y:gy, tx: ship.x+fx*spread*.4+sx2*(Math.random()-.5)*26,
       ty: ship.y+fy*spread*.4+sy2*(Math.random()-.5)*26, t:0,
       dur: (.3+(d/RANGE)*.6)*(.92+Math.random()*.16),
-      hit: Math.random() < Math.max(.1, BEGONA.acc - d/RANGE*(BEGONA.acc*.8)) });
+      hit: Math.random() < Math.max(.1, BEGONA.acc - d/RANGE*(BEGONA.acc*.8)) * (ship.cls.targetK ?? 1) });
   }
 }
 
@@ -1273,7 +1273,11 @@ function hud(){
            ? (Math.min(99, (prize.rigDamage/strikeLimit())*100).toFixed(0) + "% cut up")
            : "whole"}</b></div>` : "";
   const orders = {
-    wait: "Lie quiet. She is coming down the coast from the north-west; you will raise her topsails first. There is a watch on the Vigia, the hill above the bay: it is your canvas he sees, and only in open water. Creep out under short sail, and do not let the arch rocks have you.",
+    wait: "Lie quiet. She is coming down the coast from the north-west; you will raise her topsails first."
+        + (ship.cls.watch
+            ? " There is a watch on the Vigia, the hill above the bay: it is your canvas he sees, and only in open water. Creep out under short sail."
+            : " Nobody is watching the cape in your day: work out to the point as she comes on.")
+        + " Do not let the arch rocks have you.",
     chase: "Run her down and lay her on your beam for the broadside, but mind her own guns: she will fire back. Cut her rig up until she strikes."
          + (prize.identified ? "  " + prize.arch.near : ""),
     struck: "She has struck her colours. Close within hail and press G to grapple and board her.",
@@ -1625,6 +1629,7 @@ function drawVigiaMeter(){
 // ⭐ THE VIGIA on its hill: a cairn and a ready-laid pyre, which glows
 // as the watch makes you out and goes up in flame when he is sure.
 function drawVigia(t){
+  if (!ship.cls.watch) return;      // unmanned in the early eras
   const v = CV.VIGIA;
   if (!onScreenW(v.x, v.y, 420)) return;
   const x = T.X(v.x), y = T.Y(v.y);
@@ -1762,7 +1767,7 @@ function boardStep(dt){
   prize.canvas = 0;
   if (ship.cargo < cls.cap && hold > 0){
     chestT += dt;
-    if (chestT > 1.1){
+    if (chestT > 1.1 / (ship.cls.lootK ?? 1)){
       chestT = 0;
       chestFly = { f: 0 };
       ship.cargo += 1; hold -= 1;
@@ -1827,6 +1832,7 @@ function vigiaStep(dt){
     return;
   }
   if (phase !== "wait") return;        // once she has committed it is too late for him
+  if (!ship.cls.watch) return;         // no shore watch in Drake's or Cavendish's day
   const open = !CV.inShelter(ship.x, ship.y);
   if (open) vigia.seen = Math.min(1, vigia.seen + dt*(VIG.rateBase + ship.canvas*VIG.rateCanvas));
   else      vigia.seen = Math.max(0, vigia.seen - dt*(VIG.coolBase + (1-ship.canvas)*VIG.coolCalm));
@@ -1975,8 +1981,8 @@ function frame(now){
   if (phase === "board") drawTreasureInset();
   drawChestPops();
   if (phase !== "brief" && phase !== "over"){ drawSailMark(); drawRose(); drawReloadIcon(); }
-  if (phase === "wait" || vigia.lit) drawVigiaMeter();
-  drawVigiaMark();
+  if (ship.cls.watch && (phase === "wait" || vigia.lit)) drawVigiaMeter();
+  if (ship.cls.watch) drawVigiaMark();
   if (damageFlash > 0){
     const a = damageFlash / .55;
     const g2 = ctx.createRadialGradient(W/2, H/2, Math.min(W,H)*.3, W/2, H/2, Math.max(W,H)*.7);

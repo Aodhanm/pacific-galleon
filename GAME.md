@@ -170,6 +170,44 @@ never ran out to the escape line.
 
 ---
 
+## ⭐ The second Spaniard: you are not meant to beat her
+
+Built 2026-10-07. The Begona used to be a slightly bigger galleon you could
+batter down like any other. She is now the thing Rogers actually met.
+
+The lesson of this ship is not "she has more guns". It is a **penetration
+failure**. Rogers put about five hundred six-pound shot into her hull for two
+dead men in her tops and a shot-away mizzen yard, and diagnosed it himself:
+Manila-built timber "will not splinter", her sides "much stronger than we build
+in Europe". His people stopped loading bar and partridge because "the Ship's
+Sides were too thick to receive any Damage by it".
+
+So **sixteen percent** of your shot's effect gets through her, and the game says
+so out loud: "Your shot will not go through her sides." Measured, fighting her
+with the Desire: four broadsides in, her rig is at **0.051 of the 0.75** needed
+to make her strike, and she has killed you nearly three times over.
+
+**The escape is a race, and the stake is your greed.** The real variable is not
+speed, it is your head start, and the head start is bought with loot time.
+Measured at a fixed NW 15 kn, casting off with:
+
+| Chests taken (of 36) | She is astern by | Chase lasts |
+|---|---|---|
+| 12 | 721 yd | 29s |
+| 24 | 454 yd | 68s |
+| 36, a full hold | 235 yd | 88s |
+
+Every chest is distance. That is Cavendish's five hundred tons as a mechanic.
+
+⚠ A bug of my own this exposed: `kFwd` in the physics is quadratic **drag**,
+not speed, so terminal speed goes as the square root of `sail/kFwd`. Every
+`speedK` I wrote was therefore **inverted**, and the Santa Ana, flagged as the
+slow fat one, was the fastest of the three. Corrected with `kFwdForSpeed()`,
+which divides by k squared. The three prizes now make 6.23, 7.19 and 6.76 knots
+in the order the table says they should.
+
+---
+
 ## ⚠ Declared departures
 
 Flagged, not hidden. Each is a deliberate choice for play.

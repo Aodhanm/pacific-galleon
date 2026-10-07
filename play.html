@@ -89,6 +89,12 @@ let closure = 0, lastD = null, sailT = 0;
 let hold = 0, chestT = 0, chestFly = null;   // what is left in her, the transfer
 let preload = 0, pballs = [];                // HER guns, firing back at you
 let consort = null, preload2 = 0, cballs = [];   // the second Spaniard (the Begona)
+// ⚠ kFwd is quadratic DRAG, not speed. Terminal speed goes as
+// sqrt(sail/kFwd), so to make a ship k times as fast you must DIVIDE kFwd
+// by k squared. Multiplying kFwd by k makes her FASTER, which is the
+// opposite of what every speedK below reads as.
+const kFwdForSpeed = (base, k) => base / (k * k);
+
 // ⭐ THE PRIZE IS NOT ALWAYS THE SAME SHIP. Three real galleons, three
 // real fights, drawn at random. Reading WHICH of them is coming down on
 // you before you are committed is the skill (PLAN.md's spawn table).
@@ -121,8 +127,31 @@ const PRIZES = [
     near: "Her guns are run out and she is coming to meet you. This one means to take YOU." },
 ];
 let forcePrize = null;                       // __dev.setPrize() for testing
+
+// ⭐ THE SECOND SPANIARD. Not another galleon: the Begona, 900 tons, able
+// to carry 60 guns with about 40 mounted plus 40 patereroes and over 450
+// men, and she beat off Woodes Rogers's whole squadron in life.
+// The lesson of this ship is NOT "she has more guns". It is a PENETRATION
+// FAILURE. Rogers put about 500 six-pound shot into her hull for two dead
+// men in her tops and a shot-away mizzen yard, and diagnosed it himself:
+// Manila-built timber "will not splinter" and her sides are "much stronger
+// than we build in Europe". His people stopped loading bar and partridge
+// because "the Ship's Sides were too thick to receive any Damage by it".
+// So your shot does almost nothing to her and the game says so out loud.
+// You are not meant to beat her. You are meant to leave.
+const BEGONA = {
+  sizeK: 1.22, guns: 10, reload: [7, 2], acc: .44,
+  shotProof: .16,        // what fraction of your shot's effect gets through
+  speedK: .85,           // 900 tons: heavy, and no flyer
+  escapeGoal: 900,       // yards of offing that counts as away from her
+  // ⭐ The real mechanic here is not speed, it is your HEAD START, and the
+  // head start is bought with loot time. Measured at a fixed NW 15 kn: cast
+  // off with a third of a hold and she is about 700 yards astern; with two
+  // thirds, 475; with a full hold, 244. Every chest is distance.
+};
 let score = +(localStorage.getItem("pg_plunder") || 0);
 let burn = 0, chestPops = [];                // she is afire; the +1s over your deck
+let proofNote = 0;        // 'your shot will not go through her', counts down
 let birds = [], gullWait = 10 + Math.random()*12;
 let hits = [], damageFlash = 0, shake = 0;    // impact sparks, the red flash, a jolt
 // ⭐ THE VIGIA: the watch on the hill. `seen` is how much of you he has
@@ -142,7 +171,7 @@ function reset(){
   // every later game
   const gc = prize.cls;
   prize.cls = { ...gc, len: gc.len*arch.lenK, beam: gc.beam*arch.lenK,
-                kFwd: gc.kFwd*arch.speedK, cap: 0 };
+                kFwd: kFwdForSpeed(gc.kFwd, arch.speedK), cap: 0 };
   wp = 3;
   phase = "brief"; elapsed = 0;
   reload = 0; smoke = []; balls = []; splashes = [];
@@ -150,7 +179,7 @@ function reset(){
   hold = prize.arch.hold; chestT = 0; chestFly = null;
   preload = 3; pballs = []; burn = 0; chestPops = [];
   birds = []; gullWait = 10 + Math.random()*12;
-  hits = []; damageFlash = 0; shake = 0;
+  hits = []; damageFlash = 0; shake = 0; proofNote = 0;
   consort = null; preload2 = 0; cballs = [];
   vigia = { seen: 0, lit: false, litT: 0, smoke: [] };
   ship.rigDamage = 0; ship.damage = 0;
@@ -639,7 +668,10 @@ function combatStep(dt){
           // (GUN.strikeAt * her rig). Capping at 1 made anything over rig
           // 1.33 literally unbeatable: the Santa Ana won 8 duels out of 8
           // because her threshold was 1.16 and her damage stopped at 1.00.
-          tg.rigDamage = Math.min(2.5, (tg.rigDamage||0) + GUN.yourRigPerHit);
+          // ⭐ the Begona: your shot strikes and does not go through
+          const through = tg.proof ? BEGONA.shotProof : 1;
+          tg.rigDamage = Math.min(2.5, (tg.rigDamage||0) + GUN.yourRigPerHit*through);
+          if (tg.proof) proofNote = 2.6;
         }
         hits.push({ x: b.tx, y: b.ty, t: 0, mine: true });
         sfxHit();
@@ -662,6 +694,7 @@ function combatStep(dt){
   for (const h of hits) h.t += dt;
   hits = hits.filter(h => h.t < .5);
   damageFlash = Math.max(0, damageFlash - dt);
+  proofNote = Math.max(0, proofNote - dt);
   shake = Math.max(0, shake - dt*2.4);
   if (!prize.struck && (prize.rigDamage||0) >= GUN.strikeAt * (prize.arch ? prize.arch.rig : 1)){
     prize.struck = true; prize.struckAt = env.t;
@@ -693,6 +726,10 @@ function spawnConsort(){
   const r = 880;
   consort = makeShip("galleon", ship.x + Math.sin(a)*r, ship.y - Math.cos(a)*r, 135);
   consort.canvas = 1; consort.name = "the Begona"; consort.enemy = true;
+  consort.proof = true;
+  const bc = consort.cls;                      // a copy, never the shared class
+  consort.cls = { ...bc, len: bc.len*BEGONA.sizeK, beam: bc.beam*BEGONA.sizeK,
+                  kFwd: kFwdForSpeed(bc.kFwd, BEGONA.speedK), cap: 0 };
 }
 function consortStep(dt){
   if (!consort || consort.gone) return;
@@ -708,8 +745,8 @@ function consortStep(dt){
   const rel = norm(Math.atan2(dx,-dy) - consort.hdg), a = Math.abs(rel)*180/Math.PI;
   const d = Math.hypot(dx,dy);
   if (!(a>55 && a<125) || d > RANGE || preload2 > 0) return;
-  preload2 = GUN.consortReload + Math.random()*GUN.consortReloadVary;
-  const c = consort.cls, nG = Math.max(4, Math.floor(c.len/6));
+  preload2 = BEGONA.reload[0] + Math.random()*BEGONA.reload[1];
+  const c = consort.cls, nG = BEGONA.guns;
   const fx = Math.sin(consort.hdg), fy = -Math.cos(consort.hdg);
   const sx2 = Math.cos(consort.hdg), sy2 = Math.sin(consort.hdg);
   const side = rel > 0 ? 1 : -1;
@@ -725,7 +762,7 @@ function consortStep(dt){
     cballs.push({ x:gx, y:gy, tx: ship.x+fx*spread*.4+sx2*(Math.random()-.5)*26,
       ty: ship.y+fy*spread*.4+sy2*(Math.random()-.5)*26, t:0,
       dur: (.3+(d/RANGE)*.6)*(.92+Math.random()*.16),
-      hit: Math.random() < Math.max(.1, .4 - d/RANGE*.32) });
+      hit: Math.random() < Math.max(.1, BEGONA.acc - d/RANGE*(BEGONA.acc*.8)) });
   }
 }
 
@@ -1200,6 +1237,7 @@ function hud(){
         : g.inArc && g.d <= RANGE
           ? `<span class="g">SPACE &mdash; the ${g.side>0?"starboard":"larboard"} broadside</span>`
           : '<span class="g">SPACE &mdash; fire a broadside</span>'}</div>
+    ${proofNote > 0 ? '<div class="r"><b>Your shot will not go through her sides.</b></div>' : ""}
     ${(ship.damage > .02 || (ship.rigDamage||0) > .02) ? `<div class="r">Your ship: ${
       ship.damage > .66 ? "sorely battered" : ship.damage > .3 ? "knocked about" : "taking hits"}${
       (ship.rigDamage||0) > .05 ? ", rigging cut" : ""}</div>` : ""}`;
@@ -1214,7 +1252,7 @@ function hud(){
     : phase === "escape" ? (() => {
       const threat = consort || prize;
       const dT = Math.hypot(threat.x-ship.x, threat.y-ship.y);
-      const goal = consort ? 1300 : 750;
+      const goal = consort ? BEGONA.escapeGoal : 750;
       return `
     <div>Treasure aboard <b>${Math.floor(ship.cargo)}</b> / ${cls.cap} chests</div>
     <div>${consort ? "Outrun the Begon&#771;a" : "Get clear"} <b>${Math.max(0, goal - Math.round(dT))} yd</b> to go</div>
@@ -1240,7 +1278,7 @@ function hud(){
          + (prize.identified ? "  " + prize.arch.near : ""),
     struck: "She has struck her colours. Close within hail and press G to grapple and board her.",
     board: "The grapnels are in her rail and the chests are coming over. Press G or C to cast off with your gold, or X to fire her and leave her burning. Her consort is coming.",
-    escape: "Cast off and get clear, heavy as she is. Make for the open sea.",
+    escape: "Cast off and get clear, heavy as she is. Make for the open sea. Do not try to fight the Begona: her sides are too thick for your shot, and Rogers put five hundred shot into her for two dead men. Outrun her or lose everything.",
   };
   el("phase").textContent = {wait:"The ambush", chase:"The chase", struck:"She has struck",
     board:"Alongside", escape:"The run off"}[phase] || "";
@@ -1822,7 +1860,7 @@ function phasesStep(dt){
     const active = consort && !consort.struck && !consort.gone;
     const threat = active ? consort : prize;
     const dT = Math.hypot(threat.x - ship.x, threat.y - ship.y);
-    if (dT > (active ? 1300 : 750)) winCard();
+    if (dT > (active ? BEGONA.escapeGoal : 750)) winCard();
   }
   // beaten off: cut up too badly to go on (in the chase, or by her consort)
   if (phase !== "over" && phase !== "board" && ship.damage > (ship.cls.hull||1.5)){
